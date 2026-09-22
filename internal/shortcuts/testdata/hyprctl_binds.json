@@ -1,0 +1,7 @@
+[
+ {"locked":false,"mouse":false,"release":false,"repeat":false,"non_consuming":false,"has_description":false,"modmask":65,"submap":"","key":"u","keycode":0,"catch_all":false,"description":"","dispatcher":"exec","arg":"beam send"},
+ {"locked":false,"mouse":false,"release":false,"repeat":false,"non_consuming":false,"has_description":true,"modmask":81,"submap":"","key":"D","keycode":0,"catch_all":false,"description":"Lazydocker","dispatcher":"exec","arg":"lazydocker"},
+ {"locked":false,"mouse":false,"release":false,"repeat":false,"non_consuming":false,"has_description":true,"modmask":65,"submap":"","key":"V","keycode":0,"catch_all":false,"description":"Open Vault","dispatcher":"exec","arg":"vaultctl open"},
+ {"locked":false,"mouse":false,"release":false,"repeat":false,"non_consuming":false,"has_description":false,"modmask":65,"submap":"resize","key":"U","keycode":0,"catch_all":false,"description":"","dispatcher":"exec","arg":"x"},
+ {"locked":false,"mouse":true,"release":false,"repeat":false,"non_consuming":false,"has_description":false,"modmask":64,"submap":"","key":"mouse:272","keycode":0,"catch_all":false,"description":"","dispatcher":"movewindow","arg":""}
+]

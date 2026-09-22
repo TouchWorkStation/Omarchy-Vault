@@ -1,0 +1,2 @@
+{"smartctl":{"exit_status":8},"smart_status":{"passed":false},"temperature":{"current":39},
+ "ata_smart_attributes":{"table":[{"id":5,"name":"Reallocated_Sector_Ct","when_failed":"now","raw":{"value":2048}}]}}

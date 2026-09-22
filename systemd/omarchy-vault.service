@@ -1,0 +1,29 @@
+# Omarchy Vault — runs as YOUR user (systemctl --user), never as root.
+# Installed to ~/.config/systemd/user/ by scripts/install.sh.
+[Unit]
+Description=Omarchy Vault (private cloud dashboard and API)
+Documentation=https://github.com/TouchWorkStation/Omarchy-Vault
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/vaultd
+Restart=on-failure
+RestartSec=3
+
+# Binds to 127.0.0.1:8788 by default (see config.json "listen").
+# Hardening that works for user services:
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+UMask=0077
+
+# Idle target is well under 100 MB; cap to catch leaks.
+MemoryHigh=150M
+MemoryMax=256M
+
+[Install]
+WantedBy=default.target

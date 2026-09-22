@@ -1,0 +1,7 @@
+{"smartctl":{"exit_status":0},"device":{"name":"/dev/sda","type":"sat"},"model_name":"WDC WD80EFZZ-68BTXN0",
+ "smart_status":{"passed":true},"temperature":{"current":34},"power_on_time":{"hours":12045},
+ "ata_smart_attributes":{"table":[
+  {"id":5,"name":"Reallocated_Sector_Ct","when_failed":"","raw":{"value":0}},
+  {"id":9,"name":"Power_On_Hours","when_failed":"","raw":{"value":12045}},
+  {"id":197,"name":"Current_Pending_Sector","when_failed":"","raw":{"value":0}},
+  {"id":198,"name":"Offline_Uncorrectable","when_failed":"","raw":{"value":0}}]}}

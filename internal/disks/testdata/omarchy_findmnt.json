@@ -1,0 +1,9 @@
+{"filesystems":[
+  {"target":"/","source":"/dev/mapper/root[/@]","fstype":"btrfs","children":[
+    {"target":"/home","source":"/dev/mapper/root[/@home]","fstype":"btrfs"},
+    {"target":"/boot","source":"/dev/nvme0n1p1","fstype":"vfat"},
+    {"target":"/mnt/wdred","source":"/dev/sda1","fstype":"ext4"},
+    {"target":"/run/media/user/STICK","source":"/dev/sdc1","fstype":"exfat"},
+    {"target":"/var/lib/docker","source":"/dev/sdf1","fstype":"ext4"}
+  ]}
+]}

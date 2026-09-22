@@ -1,0 +1,22 @@
+# Build output
+/bin/
+/dist/
+web/dist/*
+!web/dist/.keep
+web/node_modules/
+web/*.tsbuildinfo
+
+# Local config and secrets never belong in git
+*.env
+.env*
+config.local.json
+*.token
+*.pem
+*.key
+credentials*.json
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/

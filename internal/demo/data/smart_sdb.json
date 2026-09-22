@@ -1,0 +1,4 @@
+{"smartctl":{"exit_status":64},"smart_status":{"passed":true},"temperature":{"current":41},"power_on_time":{"hours":40210},
+ "ata_smart_attributes":{"table":[
+  {"id":5,"name":"Reallocated_Sector_Ct","when_failed":"","raw":{"value":8}},
+  {"id":197,"name":"Current_Pending_Sector","when_failed":"","raw":{"value":0}}]}}

@@ -1,0 +1,6 @@
+{"blockdevices":[
+  {"name":"sda","kname":"sda","path":"/dev/sda","type":"disk","size":"256060514304","model":"OS Disk","rm":"0","ro":"0","rota":"0","tran":"sata","mountpoint":null,
+   "children":[{"name":"sda1","kname":"sda1","path":"/dev/sda1","type":"part","size":"256059465728","fstype":"ext4","rm":"0","ro":"0","rota":"0","mountpoint":null}]},
+  {"name":"sdb","kname":"sdb","path":"/dev/sdb","type":"disk","size":"4000787030016","model":"Data","rm":"0","ro":"0","rota":"1","tran":"sata","mountpoint":null,
+   "children":[{"name":"sdb1","kname":"sdb1","path":"/dev/sdb1","type":"part","size":"4000785104896","fstype":"ext4","rm":"0","ro":"0","rota":"1","mountpoint":"/mnt/data","fssize":"1000","fsused":"10","fsavail":"990"}]}
+]}

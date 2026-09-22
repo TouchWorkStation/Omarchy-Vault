@@ -1,0 +1,42 @@
+{
+   "blockdevices": [
+      {"name":"zram0","kname":"zram0","path":"/dev/zram0","pkname":null,"type":"disk","size":8589934592,"model":null,"serial":null,"vendor":null,"fstype":"swap","uuid":null,"label":null,"partlabel":null,"mountpoints":["[SWAP]"],"fssize":null,"fsused":null,"fsavail":null,"rm":false,"ro":false,"rota":false,"tran":null,"hotplug":false},
+      {"name":"loop0","kname":"loop0","path":"/dev/loop0","pkname":null,"type":"loop","size":104857600,"model":null,"serial":null,"vendor":null,"fstype":"squashfs","uuid":null,"label":null,"partlabel":null,"mountpoints":["/var/lib/snapd/snap/core/1"],"fssize":null,"fsused":null,"fsavail":null,"rm":false,"ro":true,"rota":false,"tran":null,"hotplug":false},
+      {"name":"sda","kname":"sda","path":"/dev/sda","pkname":null,"type":"disk","size":8001563222016,"model":"WDC WD80EFZZ-68BTXN0","serial":"WD-CA0000001","vendor":"ATA     ","fstype":null,"uuid":null,"label":null,"partlabel":null,"mountpoints":[null],"fssize":null,"fsused":null,"fsavail":null,"rm":false,"ro":false,"rota":true,"tran":"sata","hotplug":false,
+         "children": [
+            {"name":"sda1","kname":"sda1","path":"/dev/sda1","pkname":"sda","type":"part","size":8001561821184,"model":null,"serial":null,"vendor":null,"fstype":"ext4","uuid":"11111111-aaaa-bbbb-cccc-000000000001","label":"wdred","partlabel":null,"mountpoints":["/mnt/wdred"],"fssize":7875955240960,"fsused":2199023255552,"fsavail":5276787884032,"rm":false,"ro":false,"rota":true,"tran":null,"hotplug":false}
+         ]
+      },
+      {"name":"sdb","kname":"sdb","path":"/dev/sdb","pkname":null,"type":"disk","size":4000787030016,"model":"ST4000VN006-3CW104","serial":"ZW600001","vendor":"ATA     ","fstype":null,"uuid":null,"label":null,"partlabel":null,"mountpoints":[null],"fssize":null,"fsused":null,"fsavail":null,"rm":false,"ro":false,"rota":true,"tran":"sata","hotplug":false,
+         "children": [
+            {"name":"sdb1","kname":"sdb1","path":"/dev/sdb1","pkname":"sdb","type":"part","size":4000785104896,"model":null,"serial":null,"vendor":null,"fstype":"xfs","uuid":"22222222-aaaa-bbbb-cccc-000000000002","label":"seagate","partlabel":null,"mountpoints":[null],"fssize":null,"fsused":null,"fsavail":null,"rm":false,"ro":false,"rota":true,"tran":null,"hotplug":false}
+         ]
+      },
+      {"name":"sdc","kname":"sdc","path":"/dev/sdc","pkname":null,"type":"disk","size":256060514304,"model":"Extreme","serial":"USB0001","vendor":"SanDisk ","fstype":null,"uuid":null,"label":null,"partlabel":null,"mountpoints":[null],"fssize":null,"fsused":null,"fsavail":null,"rm":true,"ro":false,"rota":false,"tran":"usb","hotplug":true,
+         "children": [
+            {"name":"sdc1","kname":"sdc1","path":"/dev/sdc1","pkname":"sdc","type":"part","size":256059465728,"model":null,"serial":null,"vendor":null,"fstype":"exfat","uuid":"ABCD-1234","label":"STICK","partlabel":null,"mountpoints":["/run/media/user/STICK"],"fssize":256050000000,"fsused":1000000000,"fsavail":255050000000,"rm":true,"ro":false,"rota":false,"tran":null,"hotplug":true}
+         ]
+      },
+      {"name":"sdd","kname":"sdd","path":"/dev/sdd","pkname":null,"type":"disk","size":2000398934016,"model":"Blank Disk","serial":"BLANK1","vendor":null,"fstype":null,"uuid":null,"label":null,"partlabel":null,"mountpoints":[null],"fssize":null,"fsused":null,"fsavail":null,"rm":false,"ro":false,"rota":true,"tran":"sata","hotplug":false},
+      {"name":"sde","kname":"sde","path":"/dev/sde","pkname":null,"type":"disk","size":1000204886016,"model":"Crucial MX500","serial":"MX1","vendor":null,"fstype":null,"uuid":null,"label":null,"partlabel":null,"mountpoints":[null],"fssize":null,"fsused":null,"fsavail":null,"rm":false,"ro":false,"rota":false,"tran":"sata","hotplug":false,
+         "children": [
+            {"name":"sde1","kname":"sde1","path":"/dev/sde1","pkname":"sde","type":"part","size":1000203837440,"model":null,"serial":null,"vendor":null,"fstype":"crypto_LUKS","uuid":"33333333-aaaa-bbbb-cccc-000000000003","label":null,"partlabel":null,"mountpoints":[null],"fssize":null,"fsused":null,"fsavail":null,"rm":false,"ro":false,"rota":false,"tran":null,"hotplug":false}
+         ]
+      },
+      {"name":"sdf","kname":"sdf","path":"/dev/sdf","pkname":null,"type":"disk","size":500107862016,"model":"Samsung SSD 870","serial":"S1","vendor":null,"fstype":null,"uuid":null,"label":null,"partlabel":null,"mountpoints":[null],"fssize":null,"fsused":null,"fsavail":null,"rm":false,"ro":false,"rota":false,"tran":"sata","hotplug":false,
+         "children": [
+            {"name":"sdf1","kname":"sdf1","path":"/dev/sdf1","pkname":"sdf","type":"part","size":500106813440,"model":null,"serial":null,"vendor":null,"fstype":"ext4","uuid":"44444444-aaaa-bbbb-cccc-000000000004","label":"docker","partlabel":null,"mountpoints":["/var/lib/docker"],"fssize":490000000000,"fsused":100000000000,"fsavail":390000000000,"rm":false,"ro":false,"rota":false,"tran":null,"hotplug":false}
+         ]
+      },
+      {"name":"nvme0n1","kname":"nvme0n1","path":"/dev/nvme0n1","pkname":null,"type":"disk","size":512110190592,"model":"Samsung SSD 980 PRO 512GB","serial":"S5GXNX0000001","vendor":null,"fstype":null,"uuid":null,"label":null,"partlabel":null,"mountpoints":[null],"fssize":null,"fsused":null,"fsavail":null,"rm":false,"ro":false,"rota":false,"tran":"nvme","hotplug":false,
+         "children": [
+            {"name":"nvme0n1p1","kname":"nvme0n1p1","path":"/dev/nvme0n1p1","pkname":"nvme0n1","type":"part","size":2147483648,"model":null,"serial":null,"vendor":null,"fstype":"vfat","uuid":"AAAA-BBBB","label":null,"partlabel":"EFI","mountpoints":["/boot"],"fssize":2143281152,"fsused":150000000,"fsavail":1993281152,"rm":false,"ro":false,"rota":false,"tran":"nvme","hotplug":false},
+            {"name":"nvme0n1p2","kname":"nvme0n1p2","path":"/dev/nvme0n1p2","pkname":"nvme0n1","type":"part","size":509961158656,"model":null,"serial":null,"vendor":null,"fstype":"crypto_LUKS","uuid":"55555555-aaaa-bbbb-cccc-000000000005","label":null,"partlabel":"root","mountpoints":[null],"fssize":null,"fsused":null,"fsavail":null,"rm":false,"ro":false,"rota":false,"tran":"nvme","hotplug":false,
+               "children": [
+                  {"name":"root","kname":"dm-0","path":"/dev/mapper/root","pkname":"nvme0n1p2","type":"crypt","size":509944381440,"model":null,"serial":null,"vendor":null,"fstype":"btrfs","uuid":"66666666-aaaa-bbbb-cccc-000000000006","label":null,"partlabel":null,"mountpoints":["/var/log","/home","/.snapshots","/var/cache/pacman/pkg","/"],"fssize":509944381440,"fsused":60000000000,"fsavail":440000000000,"rm":false,"ro":false,"rota":false,"tran":null,"hotplug":false}
+               ]
+            }
+         ]
+      }
+   ]
+}

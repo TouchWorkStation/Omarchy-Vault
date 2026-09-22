@@ -1,0 +1,1 @@
+{"filesystems":[{"target":"/","source":"/dev/sda1","fstype":"ext4","children":[{"target":"/mnt/data","source":"/dev/sdb1","fstype":"ext4"}]}]}
