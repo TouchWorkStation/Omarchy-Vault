@@ -7,7 +7,7 @@ LDFLAGS := -s -w \
 	-X github.com/TouchWorkStation/Omarchy-Vault/internal/version.Version=$(VERSION) \
 	-X github.com/TouchWorkStation/Omarchy-Vault/internal/version.Commit=$(COMMIT)
 
-.PHONY: all web build test vet fmt check dev demo clean install uninstall
+.PHONY: all web build test vet fmt check dev demo clean install uninstall sftpgo
 
 all: web build
 
@@ -34,6 +34,10 @@ fmt:
 # Everything CI should run.
 check: vet test web
 	@test -z "$$(gofmt -l cmd internal web/embed.go)" || (echo "gofmt needed:"; gofmt -l cmd internal web/embed.go; exit 1)
+
+# Build the pinned file service into ~/.local/share/omarchy-vault/sftpgo.
+sftpgo:
+	./scripts/build-sftpgo.sh
 
 dev:
 	./scripts/dev.sh

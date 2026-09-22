@@ -41,21 +41,21 @@ func TestCodeIsSingleUseAndExpires(t *testing.T) {
 	l := NewLocal("tok")
 	l.Now = func() time.Time { return now }
 
-	code, _, err := l.NewCode()
+	code, _, err := l.NewCode(Identity{Username: "me", Role: "admin", Local: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	sid, _, ok := l.Redeem(code)
-	if !ok || !l.ValidSession(sid) {
+	sid, _, id, ok := l.Redeem(code)
+	if !ok || !l.ValidSession(sid) || id.Username != "me" {
 		t.Fatal("first redeem should work")
 	}
-	if _, _, ok := l.Redeem(code); ok {
+	if _, _, _, ok := l.Redeem(code); ok {
 		t.Fatal("code reused")
 	}
 
-	late, _, _ := l.NewCode()
+	late, _, _ := l.NewCode(Identity{})
 	now = now.Add(31 * time.Second)
-	if _, _, ok := l.Redeem(late); ok {
+	if _, _, _, ok := l.Redeem(late); ok {
 		t.Fatal("expired code accepted")
 	}
 
@@ -72,5 +72,15 @@ func TestCheckToken(t *testing.T) {
 	}
 	if Equal("", "") {
 		t.Fatal("empty secrets must never match")
+	}
+}
+
+func TestEndSessionsFor(t *testing.T) {
+	l := NewLocal("tok")
+	a, _, _ := l.NewSession(Identity{Username: "ann", Role: "family"})
+	b, _, _ := l.NewSession(Identity{Username: "bob", Role: "admin"})
+	l.EndSessionsFor("ann")
+	if l.ValidSession(a) || !l.ValidSession(b) {
+		t.Fatal("EndSessionsFor removed the wrong sessions")
 	}
 }

@@ -6,12 +6,18 @@ Base URL: `http://127.0.0.1:8788`. Every endpoint is also available under `/api/
 { "error": "not_found", "message": "Unknown API endpoint." }
 ```
 
-Read-only endpoints need no authentication (loopback only). State-changing endpoints need either:
+Authentication is one of:
 
-- `X-Vault-Token: <contents of ~/.config/omarchy-vault/secrets/local-token>` (CLI, Beam), or
-- the `vault_session` cookie **and** `X-Vault-Request: 1` (browser; see "Signing in").
+- `X-Vault-Token: <contents of ~/.config/omarchy-vault/secrets/local-token>`: the local owner (CLI, Beam), acts as an admin.
+- The `vault_session` cookie from a sign-in. Writes also need `X-Vault-Request: 1`.
 
-Otherwise they return `401 login_required`. Full user accounts arrive in Milestone 3.
+| Endpoint group | Before the first account | After |
+|---|---|---|
+| `GET` status, storage, remote, files | open on loopback | any signed-in user |
+| `GET` disks, settings, shortcuts, services, users | open on loopback | admins |
+| Writes (pool, users, account) | local token | admins (account: any signed-in user) |
+
+Missing auth returns `401 login_required`; the wrong role returns `403 admin_only`.
 
 Requests must carry a loopback `Host` (`127.0.0.1`, `localhost`, `::1`) or a configured domain, otherwise `421`. Non-GET requests from another origin are refused with `403`.
 
@@ -130,14 +136,43 @@ Response: `{ "storage": <GET /api/storage without candidates>, "result": { "data
 
 Stop using the current storage. Config and the `current` link are cleared; **no file is touched**.
 
-### Signing in (local)
+### Signing in
 
 | Method | Path | |
 |---|---|---|
+| POST | `/api/auth/login` | `{ "username", "password", "totp"? }` → `{ "user": … }` plus the `vault_session` cookie, and the Files cookie when Files runs. Errors: `bad_credentials` (401), `totp_required` (401), `bad_totp` (401), `locked` (429 + `Retry-After`) |
+| GET | `/api/session` | `{ "signed_in", "can_change", "user"?, "local", "accounts_exist", "files_signed_in" }` |
+| POST | `/api/logout` | needs `X-Vault-Request: 1`; clears both cookies |
 | POST | `/api/local-login` | with `X-Vault-Token`; returns `{ "path": "/login?code=…", "expires_in": 30 }` |
 | GET | `/login?code=…&next=/setup` | redeems the single-use code, sets `vault_session`, redirects to `next` (same-site paths only) |
-| GET | `/api/session` | `{ "can_change": true }` |
-| POST | `/api/logout` | needs `X-Vault-Request: 1` |
+
+### Users (admin)
+
+| Method | Path | Body |
+|---|---|---|
+| GET | `/api/users` | → `{ "users": [UserView], "folders": ["Documents", "Photos", …] }` |
+| POST | `/api/users` | `{ "username", "password", "role": "admin\|family\|guest", "folders"?: [{ "name", "access": "rw\|ro" }] }`. The first account is always an admin, needs the local token, and signs its creator in. |
+| PUT | `/api/users/{name}` | `{ "role"?, "disabled"?, "folders"? }`. Disabling or changing role signs them out. |
+| POST | `/api/users/{name}/password` | `{ "password" }`. Signs them out everywhere. |
+| DELETE | `/api/users/{name}` | Removes the account (never files) |
+
+`UserView`: `{ "username", "role", "disabled", "folders", "all_folders", "totp_enabled", "created_at" }`. Hashes and TOTP secrets are never returned.
+
+Rules: usernames are `^[a-z][a-z0-9_-]{1,31}$`, passwords are 10–256 characters, and the last active admin cannot be disabled, demoted or removed (`409 last_admin`).
+
+### Your account (any signed-in user)
+
+| Method | Path | Body |
+|---|---|---|
+| POST | `/api/account/password` | `{ "current", "new" }` |
+| POST | `/api/account/totp/setup` | → `{ "secret", "uri", "qr_svg" }` |
+| POST | `/api/account/totp/enable` | `{ "code" }` |
+| POST | `/api/account/totp/disable` | `{ "password" }` |
+
+### Files
+
+- `GET /api/files` → `{ "state": "not_installed|waiting_for_storage|starting|running|error", "installed", "running", "url": "/files/web/client/files", "message"?, "signed_in" }`
+- `/files/*` is SFTPGo's web client behind Vault's sign-in. Without a session, `GET` redirects to `/signin?next=…`.
 
 ### `GET /api/settings`
 
@@ -173,7 +208,6 @@ Each returns `{ "error": "not_implemented", "message": "…", "milestone": N }`.
 
 | Method | Path | Milestone |
 |---|---|---|
-| GET, POST | `/api/users` | 3 |
 | POST | `/api/upload-session` | 4 |
 | POST | `/api/download-session` | 5 |
 | POST | `/api/share` | 5 |

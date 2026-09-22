@@ -19,6 +19,7 @@ import (
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/shortcuts"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/sysexec"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/users"
 )
 
 const testToken = "test-token-0123456789abcdefghijklmnopqrstuvwxyz"
@@ -30,6 +31,7 @@ type env struct {
 	link     string
 	fake     *sysexec.Fake
 	lsblkKey string
+	users    *users.Store
 }
 
 // newEnv serves a machine with a system NVMe and a data drive "mounted" at
@@ -61,12 +63,18 @@ func newEnv(t *testing.T) *env {
 	cfg := config.Default()
 	cfg.VaultRoot = filepath.Join(dir, "srv-vault")
 	e := &env{mount: mount, cfgPath: filepath.Join(dir, "cfg", "config.json"), link: filepath.Join(dir, "share", "current"), fake: fake, lsblkKey: key}
+	us, err := users.Open(filepath.Join(dir, "cfg", "users.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.users = us
 	s := &Server{
 		Config:     cfg,
 		ConfigPath: e.cfgPath,
 		DataLink:   e.link,
 		Mounts:     func() (storage.MountTable, error) { return storage.MountTable{"/", mount}, nil },
 		Auth:       auth.NewLocal(testToken),
+		Users:      e.users,
 		Disks:      &disks.Scanner{Run: fake, MinRefresh: time.Nanosecond},
 		Run:        fake,
 		Shortcuts:  shortcuts.Inspector{},

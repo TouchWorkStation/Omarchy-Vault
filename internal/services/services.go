@@ -36,7 +36,7 @@ func Known() []Component {
 		{ID: "smartctl", Name: "Drive health", Purpose: "Reads SMART health data", Binary: "smartctl", Package: "smartmontools", Milestone: 1},
 		{ID: "vault", Name: "Vault service", Purpose: "Runs the Vault dashboard and API", Binary: "vaultd", Unit: "omarchy-vault.service", UserUnit: true, Package: "omarchy-vault", Milestone: 1, Required: true},
 		{ID: "mergerfs", Name: "Drive pooling", Purpose: "Combines several drives into one Vault", Binary: "mergerfs", Package: "mergerfs", Milestone: 7},
-		{ID: "sftpgo", Name: "File server", Purpose: "Browser file access, users, SFTP and WebDAV", Binary: "sftpgo", Unit: "sftpgo.service", Package: "sftpgo", Milestone: 3},
+		{ID: "sftpgo", Name: "Files", Purpose: "Browser file access for every Vault user (SFTPGo, run by Vault)", Binary: "sftpgo", Package: "scripts/build-sftpgo.sh", Milestone: 3},
 		{ID: "cloudflared", Name: "Remote access", Purpose: "Secure tunnel to your domain", Binary: "cloudflared", Unit: "cloudflared.service", Package: "cloudflared", Milestone: 6},
 		{ID: "samba", Name: "LAN sharing", Purpose: "Optional Windows/macOS network share", Binary: "smbd", Unit: "smb.service", Package: "samba", Milestone: 7},
 		{ID: "rsync", Name: "Computer backup", Purpose: "Copies folders into Vault", Binary: "rsync", Package: "rsync", Milestone: 8},
@@ -98,6 +98,26 @@ func MarkSelfRunning(comps []Component) []Component {
 			if comps[i].UnitState != "active" {
 				comps[i].UnitState = "active"
 				comps[i].Description = "running outside systemd"
+			}
+		}
+	}
+	return comps
+}
+
+// MarkFiles reports the file service as Vault sees it: SFTPGo may live in
+// ~/.local/share/omarchy-vault (not on PATH) and runs as Vault's child.
+func MarkFiles(comps []Component, installed, running bool, binary string) []Component {
+	for i := range comps {
+		if comps[i].ID == "sftpgo" {
+			comps[i].Installed = installed
+			if binary != "" {
+				comps[i].BinaryPath = binary
+			}
+			switch {
+			case running:
+				comps[i].UnitState = "active"
+			case installed:
+				comps[i].UnitState = "inactive"
 			}
 		}
 	}

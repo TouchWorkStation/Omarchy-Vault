@@ -663,7 +663,7 @@ kbd {
   }
   .tabbar {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     position: fixed;
     left: 0;
     right: 0;
@@ -933,5 +933,168 @@ button.choice:hover {
   .setup-actions .btn {
     flex: 1;
     justify-content: center;
+  }
+}
+
+/* ---------- Milestone 3: sign-in, forms, users ---------- */
+
+.signin {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.signin-card {
+  width: min(380px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+}
+.signin-brand {
+  justify-content: center;
+  padding: 0 0 8px;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.field input,
+select {
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink-strong);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  min-height: 42px;
+}
+.field input:focus,
+select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+  border-color: var(--accent);
+}
+.field input:disabled {
+  opacity: 0.6;
+}
+.btn-block {
+  width: 100%;
+  justify-content: center;
+}
+.whoami {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.signout {
+  margin: 0 10px;
+}
+.role-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.role-option {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+.role-option.selected {
+  border-color: var(--accent);
+}
+.folder-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.folder-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+}
+.folder-row select {
+  min-height: 34px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.user-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.user-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.user-row:last-child {
+  border-bottom: none;
+}
+.user-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.user-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.user-edit {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.totp-setup {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.qr {
+  width: 180px;
+  height: 180px;
+  border-radius: var(--radius);
+  background: #fff;
+}
+.secret {
+  word-break: break-all;
+}
+.code-block {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  overflow-x: auto;
+  color: var(--ink-strong);
+}
+
+@media (max-width: 760px) {
+  .form-row,
+  .role-picker,
+  .totp-setup {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -1,0 +1,371 @@
+# Omarchy Vault setup guide
+
+This guide takes you from a spare drive to a working Vault with your own account, family accounts and a file browser. Follow the parts in order the first time.
+
+1. [What you need](#1-what-you-need)
+2. [Prepare your drive](#2-prepare-your-drive)
+3. [Install Vault](#3-install-vault)
+4. [First-run setup](#4-first-run-setup)
+5. [Files](#5-files)
+6. [Users](#6-users)
+7. [Everyday use](#7-everyday-use)
+8. [Troubleshooting](#8-troubleshooting)
+9. [Uninstall](#9-uninstall)
+
+> **Vault never formats, partitions, erases or mounts drives.** It only uses a drive that is already mounted. Section 2 shows the few one-time commands *you* run to get a drive ready. Read each one before you run it.
+
+---
+
+## 1. What you need
+
+- A computer running Omarchy (or Arch Linux).
+- A second drive for your files: internal SATA/NVMe, or USB. Vault will never use the drive Omarchy runs from.
+- About 10 minutes, plus a few minutes for the first build.
+
+Commands below are typed in a terminal (Super + Enter in Omarchy).
+
+---
+
+## 2. Prepare your drive
+
+### 2.1 Find your drives
+
+```sh
+lsblk -o NAME,SIZE,MODEL,FSTYPE,LABEL,MOUNTPOINTS
+```
+
+Example:
+
+```
+NAME          SIZE MODEL                 FSTYPE      LABEL  MOUNTPOINTS
+nvme0n1     476.9G Samsung SSD 980 PRO
+├─nvme0n1p1     2G                       vfat               /boot
+└─nvme0n1p2 474.9G                       crypto_LUKS
+  └─root    474.9G                       btrfs              /home, /
+sda           7.3T WDC WD80EFZZ
+└─sda1        7.3T                       ext4        wdred
+```
+
+- The drive mounted at `/`, `/boot` or `/home` (here `nvme0n1`) is your **system drive**. Never touch it.
+- The other drive (here `sda`, partition `sda1`) is the one for your Vault.
+
+If Vault is already installed, `vaultctl disks` shows the same list and marks the system drive **SYSTEM · PROTECTED**.
+
+Then choose the section that matches your drive:
+
+| Your drive | Go to |
+|---|---|
+| Already has a filesystem (ext4, xfs, btrfs, exFAT, NTFS), possibly with files | [2.2 Mount it permanently](#22-mount-it-permanently-recommended) |
+| Brand new or blank (`FSTYPE` is empty, no partitions) | [2.4 Prepare a blank drive](#24-prepare-a-blank-drive-erases-it) |
+| Encrypted (`crypto_LUKS`) | [2.5 Encrypted drives](#25-encrypted-drives) |
+
+### 2.2 Mount it permanently (recommended)
+
+A permanent mount means the drive is always at the same folder, even before you log in. Vault needs that to stay online.
+
+**1. Get the drive's UUID.** Replace `sda1` with your partition:
+
+```sh
+lsblk -no UUID,FSTYPE /dev/sda1
+```
+
+```
+3f2b7c1e-5d8a-4e61-9c0f-1a2b3c4d5e6f ext4
+```
+
+**2. Create the mount folder:**
+
+```sh
+sudo mkdir -p /mnt/vault-disk1
+```
+
+**3. Add one line to `/etc/fstab`.** Open it:
+
+```sh
+sudo nano /etc/fstab
+```
+
+Add a line at the end. Use your UUID, and pick the line for your filesystem.
+
+ext4, xfs or btrfs:
+
+```
+UUID=3f2b7c1e-5d8a-4e61-9c0f-1a2b3c4d5e6f  /mnt/vault-disk1  ext4  defaults,nofail,x-systemd.device-timeout=10s  0 2
+```
+
+(Change `ext4` to `xfs` or `btrfs` if that is your filesystem.)
+
+exFAT or NTFS. These don't store Linux owners, so the options make the files yours. Check your IDs with `id -u` and `id -g` (usually 1000):
+
+```
+UUID=ABCD-1234  /mnt/vault-disk1  exfat  defaults,nofail,uid=1000,gid=1000,umask=077,x-systemd.device-timeout=10s  0 0
+UUID=0123ABCD4567EF89  /mnt/vault-disk1  ntfs3  defaults,nofail,uid=1000,gid=1000,umask=077,x-systemd.device-timeout=10s  0 0
+```
+
+What the options mean:
+
+- `nofail`: the computer still boots if the drive is unplugged.
+- `x-systemd.device-timeout=10s`: don't wait long for a missing drive.
+
+Save with Ctrl+O, Enter, then exit with Ctrl+X.
+
+**4. Mount it and check:**
+
+```sh
+sudo systemctl daemon-reload
+sudo mount -a
+findmnt /mnt/vault-disk1
+```
+
+`findmnt` should print one line showing your drive. If `mount -a` prints an error, open `/etc/fstab` again and fix the typo. Don't reboot with a broken line.
+
+**5. Make it yours** (ext4, xfs and btrfs only; exFAT and NTFS were handled by `uid=` above):
+
+```sh
+sudo chown "$USER:$USER" /mnt/vault-disk1
+touch /mnt/vault-disk1/.vault-write-test && rm /mnt/vault-disk1/.vault-write-test && echo "writable"
+```
+
+This only changes the owner of the top folder. Existing files keep their owners. If you have existing files you want to manage through Vault, also run `sudo chown -R "$USER:$USER" /mnt/vault-disk1/<folder>` for those folders.
+
+### 2.3 Quick alternative: mount from the file manager
+
+Open Files (Nautilus) and click the drive in the sidebar. It is mounted at `/run/media/<you>/<label>` and Vault can use it right away.
+
+The downside: it is only mounted while you are logged in, and only after you click it. For an always-on Vault, use 2.2.
+
+### 2.4 Prepare a blank drive (erases it)
+
+> **Warning:** these commands erase the drive you name. Vault never runs them for you. Triple-check the device name. It must be the new drive, never your system drive. If in doubt, stop.
+
+**1. Identify the new drive by size and model.** It should have no partitions and no mount points. Unplug and replug a USB drive and run this again to be sure which one it is:
+
+```sh
+lsblk -o NAME,SIZE,MODEL,SERIAL,FSTYPE,MOUNTPOINTS
+```
+
+**2. Set a variable** so you type the name only once. Replace `sdX` with your drive, e.g. `sdb`:
+
+```sh
+DISK=/dev/sdX
+lsblk "$DISK"          # look one last time: size and model must match the new drive
+```
+
+**3. Create one partition and an ext4 filesystem:**
+
+```sh
+sudo parted "$DISK" --script mklabel gpt mkpart vault ext4 0% 100%
+sudo mkfs.ext4 -L vault "${DISK}1"        # NVMe drives: use "${DISK}p1"
+```
+
+**4. Mount it permanently** by following [2.2](#22-mount-it-permanently-recommended) with the new partition (`sdX1`).
+
+### 2.5 Encrypted drives
+
+If the drive is LUKS-encrypted (`crypto_LUKS`), it must be unlocked before it can be mounted. For an always-on Vault, unlock it at boot with a key file (`/etc/crypttab`), then mount the unlocked device (`/dev/mapper/<name>`) as in 2.2. See the Arch Wiki page "dm-crypt/System configuration". Vault never unlocks or changes encrypted volumes. It shows a locked drive as "not unlocked" and waits.
+
+### 2.6 Check that Vault can see it
+
+After installing (section 3):
+
+```sh
+vaultctl storage
+```
+
+```
+Drives Vault can use:
+  sda1       WDC WD80EFZZ-68BTXN0       /mnt/vault-disk1             5.3 TB free of 7.9 TB
+```
+
+If your drive is missing or not usable, see [Troubleshooting](#8-troubleshooting).
+
+---
+
+## 3. Install Vault
+
+```sh
+sudo pacman -S --needed git go npm base-devel smartmontools
+git clone https://github.com/TouchWorkStation/Omarchy-Vault.git ~/Omarchy-Vault
+cd ~/Omarchy-Vault
+./scripts/install.sh --dry-run     # shows every step, changes nothing
+./scripts/install.sh
+```
+
+The installer explains each step and asks before anything optional:
+
+| Step | What it does | Needs sudo? |
+|---|---|---|
+| Build | Builds Vault into `bin/` | no |
+| File service | Builds SFTPGo v2.7.6 from its official source, pinned to one verified commit, into `~/.local/share/omarchy-vault/sftpgo` (a few minutes) | no |
+| Config | Creates `~/.config/omarchy-vault` (private) | no |
+| `/srv/vault` | Creates the shortcut `/srv/vault` → your Vault (asks) | yes, once |
+| Programs | Installs `vaultd` and `vaultctl` to `~/.local/bin` | no |
+| Service | Installs and starts the `omarchy-vault` user service | no |
+| Always on | `loginctl enable-linger`, so Vault keeps running after you log out (asks) | yes, once |
+| Shortcuts | Checks Super+Shift+V/U/D for conflicts. Changes nothing | no |
+
+If `vaultctl` is "not found", add `~/.local/bin` to your PATH:
+
+```sh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+```
+
+Check everything:
+
+```sh
+vaultctl doctor
+```
+
+---
+
+## 4. First-run setup
+
+```sh
+vaultctl setup
+```
+
+Your browser opens, already signed in as this computer's owner. The six screens:
+
+1. **Welcome.** Click Get Started.
+2. **Storage.** Your drives. The system drive shows SYSTEM · Protected and can't be picked. Choose your Vault drive and click Select Drive.
+3. **Vault Storage.** Choose "A Vault folder" (recommended: creates `Vault` on the drive and leaves your other files alone) or "The whole drive". Keep "Create folders" on for Photos, Documents, Backups, Projects, Phone Uploads and Shared. Click **Create Vault**.
+4. **Account.** Create your admin account (username + password, 10+ characters). You'll use it to sign in to Vault and Files. You can set up two-factor later in Account.
+5. **Remote Access.** Click Skip for now (arrives in Milestone 6).
+6. **Your Vault is ready.** Shows your free space. **Open Files** takes you straight to your files.
+
+### The same from the terminal
+
+```sh
+vaultctl storage                      # drives you can use
+vaultctl storage use sda1             # or: vaultctl storage use /mnt/vault-disk1
+vaultctl users add chris              # first account is always an admin; asks for a password
+vaultctl link                         # optional: /srv/vault shortcut (asks for sudo once)
+```
+
+Options for `storage use`:
+
+- `--folder Media/Vault`: a different folder on the drive
+- `--whole-drive`: use the whole drive
+- `--no-default-folders`: skip Photos, Documents, …
+
+### Where your files are
+
+```
+/srv/vault/                      → ~/.local/share/omarchy-vault/current → /mnt/vault-disk1/Vault
+  Photos/  Documents/  Backups/  Projects/  Phone Uploads/  Shared/
+```
+
+They are ordinary files on your drive. You can also open them with any app at `/srv/vault` or `/mnt/vault-disk1/Vault`.
+
+---
+
+## 5. Files
+
+Files is your Vault in the browser: browse, upload, download (folders as zip), create, rename and move.
+
+- Open it from the dashboard (**Open Files**), from the Files page, or at http://127.0.0.1:8788/files/web/client/files
+- Signing in to Vault signs you in to Files as well. If Files asks you to sign in, use the same Vault username and password.
+- **Admins** see every folder. **Family** sees only their folders (read & write, or read only per folder). **Guests** see only their folders, always read only.
+- Uploads go straight to the drive. There is no size limit other than free space.
+
+In this version, Vault's pages (and Files) are reachable **from this computer only**. Reaching Vault from phones and other computers arrives with Remote Access (Milestone 6), which adds encryption (TLS). Until then, please don't open Vault to your network by changing `listen`.
+
+If Files says it is not installed, run `./scripts/build-sftpgo.sh` (or re-run the installer), then `systemctl --user restart omarchy-vault`.
+
+---
+
+## 6. Users
+
+Open **Users** in the dashboard (admins only), or use `vaultctl users`.
+
+| Role | Can do |
+|---|---|
+| Admin | Everything: storage, users, settings, all files |
+| Family | Open the folders you give them; read & write or read only per folder |
+| Guest | Open the folders you give them, read only |
+
+### In the dashboard
+
+- **Create user:** username, password, role, then tick folders (and pick Read & write or Read only).
+- **Folders:** change what they can open.
+- **Reset password:** sets a new one and signs them out everywhere.
+- **Disable / Enable:** a disabled user is signed out immediately and can't sign in.
+- **Remove:** deletes the account. Their files stay in the Vault.
+
+### In the terminal
+
+```sh
+vaultctl users                                                   # list
+vaultctl users add ann --role family --folders "Photos,Documents:ro"
+vaultctl users add gus --role guest --folders "Shared"
+vaultctl users folders ann "Photos,Documents,Shared:ro"
+vaultctl users reset-password ann
+vaultctl users disable ann
+vaultctl users enable ann
+vaultctl users remove gus
+```
+
+### Your own account
+
+Open **Account** (click your name in the sidebar):
+
+- **Change password:** other devices are signed out.
+- **Two-factor sign-in:** scan the QR code with an authenticator app (Aegis, 2FAS, Google Authenticator, 1Password…) and enter the 6-digit code. From then on, signing in asks for a code. To turn it off, enter your password.
+
+### Rules that keep you safe
+
+- Vault always keeps at least one active admin. You can't disable, demote or remove the last one.
+- After 5 wrong passwords, sign-in for that account pauses for 1 minute, then 2, 4… up to 15 minutes.
+- Passwords are stored only as argon2id hashes (in `~/.config/omarchy-vault/users.json`, private to you).
+
+---
+
+## 7. Everyday use
+
+- **Open Vault:** `vaultctl open`, or add the shortcut (see the README "Shortcuts" section): `bindd = SUPER SHIFT, V, Open Vault, exec, vaultctl open` in `~/.config/hypr/bindings.conf`.
+- **Status at a glance:** `vaultctl status`, or the Home page.
+- **Drive unplugged or not mounted:** Vault shows your storage as *Offline*, pauses Files, and never writes anything to your system drive in the meantime. Plug the drive back in (or `sudo mount -a`) and everything resumes within about 20 seconds.
+- **Drive mounted somewhere else:** Vault shows *Drive moved*. Choose it again in Storage → *Use it at its new location*.
+- **Change drives:** Storage → Change drive. Files on the old drive stay there. Copy them over if you want them in the new Vault.
+- **Stop using a drive:** Storage → Stop using this drive (or `vaultctl storage forget`). Nothing is deleted.
+- **Back up Vault's own settings:** copy `~/.config/omarchy-vault/` (settings, users, secrets; keep it private) and `~/.local/share/omarchy-vault/sftpgo/data/`.
+
+---
+
+## 8. Troubleshooting
+
+Start with:
+
+```sh
+vaultctl doctor
+vaultctl logs -f        # live log of the Vault service
+```
+
+| Problem | Fix |
+|---|---|
+| `vaultctl: the Vault service is not running` | `systemctl --user enable --now omarchy-vault`, then check `vaultctl logs` |
+| My drive is not listed under "Drives Vault can use" | It isn't mounted, or it's mounted somewhere Vault avoids (`/var`, `/usr`, `/tmp`, `/root`…). Mount it under `/mnt/…` (section 2.2) |
+| Drive shows **Not mounted** | Mount it (2.2 or 2.3). Vault never mounts drives itself |
+| Drive shows **Can't use: No filesystem** | It's blank. See 2.4 (erases it) |
+| Drive shows **Encrypted volume not unlocked** | Unlock it first (2.5) |
+| Drive shows **Read-only** | Check the filesystem (`sudo dmesg \| tail`) or the mount options in `/etc/fstab` |
+| "Permission denied" when uploading | The drive folder isn't owned by you: `sudo chown "$USER:$USER" /mnt/vault-disk1/Vault` (ext4/xfs/btrfs), or add `uid=`/`gid=` for exFAT/NTFS (2.2) |
+| Files says "not installed" | `./scripts/build-sftpgo.sh`, then `systemctl --user restart omarchy-vault` |
+| Files says "waiting for storage" | Your drive is offline; see "Drive unplugged" above |
+| Forgot the admin password | On this computer: `vaultctl users reset-password <name>` (the terminal is trusted as the owner) |
+| Locked out after wrong passwords | Wait 1–15 minutes, or reset the password from the terminal |
+| "That sign-in link expired" | Open Vault again with `vaultctl open` (links from it work once, for 30 seconds) |
+| Vault stops when I log out | `sudo loginctl enable-linger "$USER"` |
+| Could not identify the system drive | Vault then refuses every drive, to be safe. Run `vaultctl disks` and `findmnt /`, and report it as an issue |
+
+---
+
+## 9. Uninstall
+
+```sh
+cd ~/Omarchy-Vault
+./scripts/uninstall.sh --dry-run
+./scripts/uninstall.sh
+```
+
+This removes the programs, the service, the file service program and the `/srv/vault` shortcut. It keeps your settings, your users and **every file on your drive**. To also remove settings: `rm -rf ~/.config/omarchy-vault ~/.local/share/omarchy-vault`. Your fstab line and drive are untouched; remove the fstab line yourself if you no longer want the drive mounted.

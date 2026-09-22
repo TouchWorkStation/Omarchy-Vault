@@ -22,10 +22,12 @@ import (
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/config"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/disks"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/files"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/services"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/shortcuts"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/sysexec"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/users"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/version"
 )
 
@@ -42,7 +44,12 @@ type Server struct {
 	// Mounts reads the kernel mount table; storage.ReadMountTable by default.
 	Mounts func() (storage.MountTable, error)
 	// Auth guards state-changing endpoints. Nil disables all writes.
-	Auth      *auth.Local
+	Auth *auth.Local
+	// Users is the account store; Limiter slows password guessing.
+	Users   *users.Store
+	Limiter *auth.LoginLimiter
+	// Files supervises SFTPGo. Nil when not configured.
+	Files     *files.Manager
 	Disks     *disks.Scanner
 	Run       sysexec.Runner
 	Shortcuts shortcuts.Inspector
@@ -100,31 +107,56 @@ func (s *Server) Handler() http.Handler {
 		s.Started = time.Now()
 	}
 	s.cur = s.Config
+	if s.Limiter == nil {
+		s.Limiter = auth.NewLoginLimiter()
+	}
 	mux := http.NewServeMux()
 
 	known := map[string]bool{}
-	get := func(p string, h http.HandlerFunc) {
-		mux.HandleFunc("GET /api/"+p, h)
-		mux.HandleFunc("GET /api/v1/"+p, h)
+	// route registers an endpoint under /api/ and /api/v1/.
+	route := func(method, p string, h http.HandlerFunc) {
+		mux.HandleFunc(method+" /api/"+p, h)
+		mux.HandleFunc(method+" /api/v1/"+p, h)
 		known["/api/"+p], known["/api/v1/"+p] = true, true
 	}
-	get("status", s.handleStatus)
-	get("disks", s.handleDisks)
-	get("storage", s.handleStorage)
-	get("settings", s.handleSettings)
-	get("shortcuts", s.handleShortcuts)
-	get("services", s.handleServices)
-	get("remote", s.handleRemote)
-	get("session", s.handleSession)
+	const user, admin = false, true
 
-	// State-changing endpoints: local token or session required.
-	mux.Handle("POST /api/pool", s.requireAuth(http.HandlerFunc(s.handleAdopt)))
-	mux.Handle("POST /api/v1/pool", s.requireAuth(http.HandlerFunc(s.handleAdopt)))
-	mux.Handle("DELETE /api/pool", s.requireAuth(http.HandlerFunc(s.handleForget)))
-	mux.Handle("DELETE /api/v1/pool", s.requireAuth(http.HandlerFunc(s.handleForget)))
-	mux.HandleFunc("POST /api/local-login", s.handleLocalLogin)
-	mux.HandleFunc("POST /api/logout", s.handleLogout)
+	// Any signed-in user (open on loopback until the first account exists).
+	route("GET", "status", s.gate(user, s.handleStatus))
+	route("GET", "storage", s.gate(user, s.handleStorage))
+	route("GET", "remote", s.gate(user, s.handleRemote))
+	route("GET", "files", s.gate(user, s.handleFilesStatus))
+	route("POST", "account/password", s.gate(user, s.handleChangePassword))
+	route("POST", "account/totp/setup", s.gate(user, s.handleTOTPSetup))
+	route("POST", "account/totp/enable", s.gate(user, s.handleTOTPEnable))
+	route("POST", "account/totp/disable", s.gate(user, s.handleTOTPDisable))
+
+	// Admins only.
+	route("GET", "disks", s.gate(admin, s.handleDisks))
+	route("GET", "settings", s.gate(admin, s.handleSettings))
+	route("GET", "shortcuts", s.gate(admin, s.handleShortcuts))
+	route("GET", "services", s.gate(admin, s.handleServices))
+	route("POST", "pool", s.gate(admin, s.handleAdopt))
+	route("DELETE", "pool", s.gate(admin, s.handleForget))
+	route("GET", "users", s.gate(admin, s.handleListUsers))
+	route("POST", "users", s.gate(admin, s.handleCreateUser))
+	route("PUT", "users/{name}", s.gate(admin, s.handleUpdateUser))
+	route("DELETE", "users/{name}", s.gate(admin, s.handleDeleteUser))
+	route("POST", "users/{name}/password", s.gate(admin, s.handleResetPassword))
+
+	// Signing in and out.
+	route("GET", "session", s.handleSession)
+	route("POST", "auth/login", s.handlePasswordLogin)
+	route("POST", "logout", s.handleLogout)
+	route("POST", "local-login", s.handleLocalLogin)
 	mux.HandleFunc("GET /login", s.handleLogin)
+
+	// Files (SFTPGo web client) behind Vault's sign-in. The dashboard's
+	// own /files page is registered exactly so it is not redirected into
+	// the proxy.
+	static := s.staticHandler()
+	mux.Handle(files.WebRoot+"/", s.filesProxy())
+	mux.Handle("GET "+files.WebRoot, static)
 
 	for _, p := range planned {
 		p := p
@@ -149,7 +181,7 @@ func (s *Server) Handler() http.Handler {
 		}
 		writeError(w, http.StatusNotFound, "not_found", "Unknown API endpoint.")
 	})
-	mux.Handle("/", s.staticHandler())
+	mux.Handle("/", static)
 
 	extraHosts := append([]string{}, s.Config.Security.AllowedHosts...)
 	if s.Config.Remote.Domain != "" {
@@ -174,8 +206,6 @@ type plannedEndpoint struct {
 // planned lists API endpoints that exist in the design but are delivered by
 // later milestones.
 var planned = []plannedEndpoint{
-	{"GET", "users", "User management", 3},
-	{"POST", "users", "User management", 3},
 	{"POST", "upload-session", "Upload to Vault", 4},
 	{"POST", "download-session", "Download from Vault", 5},
 	{"POST", "share", "Share links", 5},
@@ -203,6 +233,7 @@ type StatusResponse struct {
 	Remote        RemoteStatus          `json:"remote"`
 	Users         UsersStatus           `json:"users"`
 	Services      []services.Component  `json:"services"`
+	Files         files.Status          `json:"files"`
 	Shortcuts     []ShortcutStatusBrief `json:"shortcuts"`
 	Warnings      []string              `json:"warnings,omitempty"`
 }
@@ -218,8 +249,14 @@ type RemoteStatus struct {
 
 // UsersStatus summarises user accounts.
 type UsersStatus struct {
-	Count     *int `json:"count"`
-	Milestone int  `json:"milestone"`
+	Count int `json:"count"`
+}
+
+func (s *Server) usersStatus() UsersStatus {
+	if s.Users == nil {
+		return UsersStatus{}
+	}
+	return UsersStatus{Count: s.Users.Count()}
 }
 
 // ShortcutStatusBrief is the dashboard view of one shortcut.
@@ -251,8 +288,13 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		SetupComplete: st.Configured,
 		Storage:       st,
 		Remote:        s.remoteStatus(),
-		Users:         UsersStatus{Milestone: 3},
-		Services:      services.MarkSelfRunning(services.Check(ctx, s.Run)),
+		Users:         s.usersStatus(),
+		Services:      s.servicesStatus(ctx),
+	}
+	if s.Files != nil {
+		resp.Files = s.Files.Status()
+	} else {
+		resp.Files = files.Status{State: files.StateNotInstalled, URL: files.ClientPath}
 	}
 	s.mu.RLock()
 	cfgErr := s.ConfigErr
@@ -355,7 +397,16 @@ func (s *Server) handleShortcuts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleServices(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"services": services.MarkSelfRunning(services.Check(r.Context(), s.Run))})
+	writeJSON(w, http.StatusOK, map[string]any{"services": s.servicesStatus(r.Context())})
+}
+
+func (s *Server) servicesStatus(ctx context.Context) []services.Component {
+	comps := services.MarkSelfRunning(services.Check(ctx, s.Run))
+	if s.Files != nil {
+		st := s.Files.Status()
+		comps = services.MarkFiles(comps, st.Installed, st.Running, s.Files.Paths.Binary)
+	}
+	return comps
 }
 
 func (s *Server) remoteStatus() RemoteStatus {

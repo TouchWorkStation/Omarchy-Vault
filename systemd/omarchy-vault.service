@@ -21,9 +21,12 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 SystemCallArchitectures=native
 UMask=0077
 
-# Idle target is well under 100 MB; cap to catch leaks.
-MemoryHigh=150M
-MemoryMax=256M
+# vaultd idles around 10-15 MB and the file service (SFTPGo, a child
+# process) around 40-60 MB. Caps catch leaks without hurting big uploads.
+MemoryHigh=300M
+MemoryMax=512M
+# Stop the file service together with Vault.
+KillMode=control-group
 
 [Install]
 WantedBy=default.target

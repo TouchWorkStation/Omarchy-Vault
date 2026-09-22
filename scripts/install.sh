@@ -71,7 +71,7 @@ fi
 # 3. Dependencies.
 say "Checking dependencies"
 missing_build=()
-for tool in go npm; do
+for tool in go npm git gcc; do
   command -v "$tool" >/dev/null || missing_build+=("$tool")
 done
 for tool in lsblk findmnt; do
@@ -91,13 +91,31 @@ fi
 # 4. Build.
 if [[ $NO_BUILD -eq 0 ]]; then
   if [[ ${#missing_build[@]} -gt 0 ]]; then
-    echo "Building needs: ${missing_build[*]} (sudo pacman -S --needed go npm), or pass --no-build with prebuilt bin/." >&2
-    exit 1
+    warn "Building needs: ${missing_build[*]}"
+    if command -v pacman >/dev/null && ask "Install them with: sudo pacman -S --needed go npm git base-devel ?"; then
+      run sudo pacman -S --needed go npm git base-devel
+    else
+      echo "Install them (sudo pacman -S --needed go npm git base-devel) or pass --no-build with prebuilt bin/." >&2
+      exit 1
+    fi
   fi
   say "Building Vault"
   run make -C "$REPO" all
 fi
 [[ $DRY_RUN -eq 1 || -x "$REPO/bin/vaultd" ]] || { echo "bin/vaultd missing; run make all" >&2; exit 1; }
+
+# 4b. File service (SFTPGo), built from a pinned, verified source tag into
+#     your home folder. Needed for Files and user accounts' file access.
+say "File service (Files)"
+if [[ -x "$DATA_DIR/sftpgo/bin/sftpgo" ]]; then
+  note "SFTPGo already installed in $DATA_DIR/sftpgo"
+elif command -v sftpgo >/dev/null && [[ -d /usr/share/sftpgo/templates ]]; then
+  note "Using the system SFTPGo ($(command -v sftpgo))"
+elif ask "Build the file service (SFTPGo v2.7.6) now? It takes a few minutes."; then
+  run "$REPO/scripts/build-sftpgo.sh" "$DATA_DIR/sftpgo"
+else
+  note "Skipped. Files stays off until you run: ./scripts/build-sftpgo.sh"
+fi
 
 # 5. Config directory (private).
 say "Creating config directory"
@@ -137,8 +155,17 @@ run install -m 0644 "$REPO/systemd/omarchy-vault.service" "$UNIT_DIR/omarchy-vau
 run systemctl --user daemon-reload
 if ask "Enable and start Vault now?"; then
   run systemctl --user enable --now omarchy-vault.service
+  run systemctl --user restart omarchy-vault.service
 else
   note "Start later with: systemctl --user enable --now omarchy-vault"
+fi
+if [[ ! -e "/var/lib/systemd/linger/$USER" ]]; then
+  note "Vault runs while you are logged in. To keep it running after you log out (always-on):"
+  if ask "Keep Vault running after logout (sudo loginctl enable-linger $USER)?"; then
+    run sudo loginctl enable-linger "$USER"
+  else
+    note "Later: sudo loginctl enable-linger $USER"
+  fi
 fi
 
 # 9. Omarchy plugin files (not wired into the panel until it is ready).
@@ -160,7 +187,7 @@ fi
 say "Done"
 cat <<MSG
 
-    Set up storage:    vaultctl setup          (opens the setup screens)
+    Set up storage:    vaultctl setup          (choose a drive, create your account)
     Open Vault:        vaultctl open           (http://127.0.0.1:8788)
     Check everything:  vaultctl doctor
     See your drives:   vaultctl disks

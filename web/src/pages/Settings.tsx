@@ -3,7 +3,7 @@ import { Badge, Card, Kbd, Loading, Notice } from "../components/ui";
 import { useApi } from "../useApi";
 import { useState } from "react";
 
-function ServiceRow({ s }: { s: Service }) {
+function ServiceRow({ s, current }: { s: Service; current: number }) {
   let badge;
   if (s.installed && (!s.unit || s.unit_state === "active")) badge = <Badge tone="good" glyph="●">Ready</Badge>;
   else if (s.installed) badge = <Badge tone="muted" glyph="○">{s.unit_state ?? "Installed"}</Badge>;
@@ -15,7 +15,7 @@ function ServiceRow({ s }: { s: Service }) {
         <div>{s.name}</div>
         <div className="muted small">
           {s.purpose}
-          {!s.installed && s.milestone > 1 ? ` · needed from Milestone ${s.milestone}` : ""}
+          {!s.installed && s.milestone > current ? ` · needed from Milestone ${s.milestone}` : ""}
         </div>
       </div>
       {badge}
@@ -134,7 +134,7 @@ export function Settings() {
           ) : (
             <ul className="services">
               {status.services.map((s) => (
-                <ServiceRow key={s.id} s={s} />
+                <ServiceRow key={s.id} s={s} current={status.milestone} />
               ))}
             </ul>
           )}

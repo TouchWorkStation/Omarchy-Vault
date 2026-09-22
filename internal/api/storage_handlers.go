@@ -126,6 +126,8 @@ func (s *Server) handleAdopt(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	resp.Storage = s.storageStatus(r.Context(), inv)
+	s.checkStorage(r.Context())
+	s.syncFilesAsync()
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -157,6 +159,9 @@ func (s *Server) handleForget(w http.ResponseWriter, r *http.Request) {
 		resp.Notes = append(resp.Notes, "Vault no longer uses "+p.DataDir()+". Every file is still there.")
 	}
 	s.Log.Info("vault storage released")
+	if s.Files != nil {
+		s.Files.SetWanted(false)
+	}
 	inv, _ := s.Disks.Inventory(r.Context(), false)
 	resp.Storage = s.storageStatus(r.Context(), inv)
 	writeJSON(w, http.StatusOK, resp)

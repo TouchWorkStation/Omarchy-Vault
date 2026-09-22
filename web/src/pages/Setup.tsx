@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ApiError, send, type Disk, type Inventory, type PoolResponse, type Session, type Status, type Volume } from "../api";
 import { Link, navigate } from "../App";
 import { icons } from "../components/Icons";
-import { Badge, Card, HealthBadge, Kbd, Loading, Notice } from "../components/ui";
+import { Badge, Card, HealthBadge, Loading, Notice } from "../components/ui";
 import { bytes } from "../format";
 import { useApi } from "../useApi";
 
@@ -226,6 +226,90 @@ function VaultStep({
   );
 }
 
+function AccountStep({ session, onDone }: { session: Session | null; onDone: () => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  if (session?.accounts_exist) {
+    return (
+      <>
+        <h1>ACCOUNT</h1>
+        <Card>
+          <p className="lead">{session.user ? `You're signed in as ${session.user.username}.` : "Your Vault account already exists."}</p>
+          <p className="muted">Add family and guests later in Users.</p>
+        </Card>
+        <div className="setup-actions">
+          <button className="btn btn-primary" onClick={onDone}>
+            Continue
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (password !== confirm) {
+      setError("The passwords don't match.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await send("POST", "/api/users", { username, password, role: "admin" });
+      onDone();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <h1>ACCOUNT</h1>
+      <p className="subtitle">Create your admin account. You'll use it to sign in to Vault and Files.</p>
+      <form className="card form" onSubmit={submit}>
+        <label className="field">
+          <span>Username</span>
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value.toLowerCase())}
+            autoCapitalize="none"
+            spellCheck={false}
+            autoComplete="username"
+            pattern="[a-z][a-z0-9_\-]{1,31}"
+            title="2–32 lowercase letters, digits, - or _"
+            required
+          />
+        </label>
+        <label className="field">
+          <span>Password (10+ characters)</span>
+          <input type="password" autoComplete="new-password" minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </label>
+        <label className="field">
+          <span>Repeat password</span>
+          <input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+        </label>
+        <dl className="kv">
+          <dt>2FA</dt>
+          <dd>Set up later in Account</dd>
+        </dl>
+        {session && !session.can_change && <Notice tone="warn">{session.hint}</Notice>}
+        {error && <Notice tone="bad">{error}</Notice>}
+        <div className="setup-actions">
+          <button className="btn btn-primary" disabled={busy || !session?.can_change}>
+            {busy ? "Creating…" : "Create account"}
+          </button>
+        </div>
+      </form>
+    </>
+  );
+}
+
 export function Setup() {
   const params = new URLSearchParams(window.location.search);
   const [step, setStep] = useState<Step>(params.get("volume") ? "storage" : "welcome");
@@ -299,27 +383,7 @@ export function Setup() {
       );
       break;
     case "account":
-      body = (
-        <>
-          <h1>ACCOUNT</h1>
-          <Card>
-            <p className="lead">Sign-in and user accounts arrive in Milestone 3.</p>
-            <p className="muted">
-              Until then, Vault only accepts changes from this computer, and only from you. Opening Vault with{" "}
-              <Kbd combo="Super + Shift + V" /> or <code>vaultctl open</code> signs you in.
-            </p>
-            <dl className="kv">
-              <dt>2FA</dt>
-              <dd>Set up later</dd>
-            </dl>
-          </Card>
-          <div className="setup-actions">
-            <button className="btn btn-primary" onClick={() => setStep("remote")}>
-              Continue
-            </button>
-          </div>
-        </>
-      );
+      body = <AccountStep session={session} onDone={() => setStep("remote")} />;
       break;
     case "remote":
       body = (
@@ -367,9 +431,9 @@ export function Setup() {
             </Notice>
           )}
           <div className="setup-actions center">
-            <Link to="/files" className="btn btn-primary">
+            <a href="/files/web/client/files" className="btn btn-primary">
               {icons.files} Open Files
-            </Link>
+            </a>
           </div>
           <p className="muted small">Quick Actions</p>
           <div className="setup-actions center">

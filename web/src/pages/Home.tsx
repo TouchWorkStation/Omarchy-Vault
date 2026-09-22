@@ -1,4 +1,4 @@
-import type { ShortcutBrief, Status } from "../api";
+import type { Session, ShortcutBrief, Status } from "../api";
 import { Link } from "../App";
 import { icons } from "../components/Icons";
 import { Badge, Card, Kbd, Loading, Meter, Notice, Stat } from "../components/ui";
@@ -32,11 +32,12 @@ function shortcutBadge(s: ShortcutBrief["status"]) {
 const actions = [
   { to: "/upload", icon: icons.upload, label: "Upload", sub: "Phone → Vault", m: 4 },
   { to: "/download", icon: icons.download, label: "Download", sub: "Vault → Phone", m: 5 },
-  { to: "/files", icon: icons.files, label: "Open Files", sub: "Browse your Vault", m: 3 },
+  { to: "/files", icon: icons.files, label: "Open Files", sub: "Browse your Vault", m: 0 },
 ];
 
 export function Home() {
   const { data: s, error } = useApi<Status>("/api/status", 60_000);
+  const { data: session } = useApi<Session>("/api/session");
 
   if (error && !s) {
     return (
@@ -68,7 +69,7 @@ export function Home() {
         </Notice>
       ))}
 
-      {!s.setup_complete && (
+      {!s.setup_complete && session?.can_change && (
         <Card className="setup-cta">
           <div>
             <h2>SET UP YOUR VAULT</h2>
@@ -110,7 +111,11 @@ export function Home() {
           />
         </div>
         <div className="tile">
-          <Stat label="Users" value={s.users.count ?? "—"} sub={`Milestone ${s.users.milestone}`} />
+          <Stat
+            label="Users"
+            value={s.users.count}
+            sub={s.files.state === "running" ? "Files running" : s.files.state === "not_installed" ? "Files not installed" : "Files paused"}
+          />
         </div>
       </div>
 
@@ -121,7 +126,7 @@ export function Home() {
               {a.icon}
               <span className="action-label">{a.label}</span>
               <span className="action-sub">{a.sub}</span>
-              <span className="action-soon">Milestone {a.m}</span>
+              {a.m > 0 && <span className="action-soon">Milestone {a.m}</span>}
             </Link>
           ))}
         </div>
@@ -141,8 +146,17 @@ export function Home() {
           <p className="muted small">Vault never overwrites an existing shortcut.</p>
         </Card>
 
-        <Card title="RECENT FILES">
-          <p className="muted">Recent uploads and changes appear here once Files arrive in Milestone 3.</p>
+        <Card title="FILES">
+          {s.files.state === "running" ? (
+            <>
+              <p className="muted">Browse, upload and download from any browser on this computer.</p>
+              <a className="btn btn-primary" href={s.files.url}>
+                {icons.files} OPEN FILES
+              </a>
+            </>
+          ) : (
+            <p className="muted">{s.files.message ?? "Files is starting…"}</p>
+          )}
         </Card>
       </div>
     </section>

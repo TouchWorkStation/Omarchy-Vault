@@ -22,16 +22,18 @@ It is **not** a replacement for TrueNAS, Unraid or ZimaOS. There is no separate 
 
 ## Status
 
-**Milestones 1 and 2 of 7 are complete.** Vault discovers your drives, protects the system disk, and lets you turn one mounted drive into your Vault through a six-step setup. See [ROADMAP.md](ROADMAP.md).
+**Milestones 1–3 of 7 are complete.** Vault protects your system disk, turns a mounted drive into your Vault, and gives everyone in the house their own account and a file browser. See [ROADMAP.md](ROADMAP.md).
 
 | Works now | Coming |
 |---|---|
-| First-run setup: choose a drive, create your Vault (M2) | File browser and users via SFTPGo (M3) |
-| Your Vault at `/srv/vault`, default folders created if missing (M2) | **Upload to Vault**: Super+Shift+U, QR code (M4) |
-| Unplugged or moved drives detected; nothing written to the system disk (M2) | **Download from Vault**: Super+Shift+D, QR code (M5) |
-| Dashboard (desktop and phone), drive discovery, SYSTEM · PROTECTED detection | Remote access through Cloudflare Tunnel (M6) |
-| SMART health: Healthy / Warning / Critical / Unknown | Combining several drives, LAN sharing (M7) |
-| Shortcut conflict detection (never installs) | Backups (M8) |
+| First-run setup: choose a drive, create your admin account | **Upload to Vault**: Super+Shift+U, QR code (M4) |
+| **Files** in the browser: browse, upload, download, folders (M3) | **Download from Vault**: Super+Shift+D, QR code (M5) |
+| **Users**: Admin / Family / Guest, per-folder read & write or read only (M3) | Share links (M5) |
+| Sign-in with lockout, optional two-factor (TOTP) (M3) | Remote access through Cloudflare Tunnel (M6) |
+| Your Vault at `/srv/vault`; unplugged drives never fill the system disk (M2) | Combining several drives, LAN sharing (M7) |
+| Drive discovery, SYSTEM · PROTECTED detection, SMART health (M1) | Backups (M8) |
+
+**New here? Follow the [setup guide](docs/setup-guide.md)**: preparing a drive, installing, first-run, Files and users, step by step.
 
 ## Features (planned for v0.1)
 
@@ -47,40 +49,31 @@ It is **not** a replacement for TrueNAS, Unraid or ZimaOS. There is no separate 
 
 ## Quick start
 
-Requirements: Omarchy or Arch Linux, `go` ≥ 1.24 and `npm` to build, `util-linux` (preinstalled). Optional: `smartmontools` for drive health.
+Requirements: Omarchy or Arch Linux with `git go npm base-devel` (the installer offers to install them). Optional: `smartmontools` for drive health. You also need a second drive that is mounted; see [preparing your drive](docs/setup-guide.md#2-prepare-your-drive).
 
 ```sh
-git clone https://github.com/TouchWorkStation/Omarchy-Vault.git
-cd Omarchy-Vault
+git clone https://github.com/TouchWorkStation/Omarchy-Vault.git ~/Omarchy-Vault
+cd ~/Omarchy-Vault
 
 ./scripts/install.sh --dry-run   # see exactly what will happen
-./scripts/install.sh             # build, install for your user, start the service
+./scripts/install.sh             # build Vault + the file service, install for your user, start it
+vaultctl setup                   # choose your drive and create your account in the browser
 ```
 
-Then set up your Vault:
+Everyday commands:
 
 ```sh
-vaultctl setup                 # opens the setup screens in your browser
-# or, from the terminal:
-vaultctl storage               # drives Vault can use
-vaultctl storage use sda1      # use that drive (creates a Vault folder on it)
-vaultctl link                  # optional: also reach it at /srv/vault (sudo once)
-```
-
-Other useful commands:
-
-```sh
-vaultctl open        # open the dashboard, signed in
-vaultctl doctor      # check everything Vault needs
-vaultctl disks       # list drives; the system disk is marked SYSTEM · PROTECTED
-vaultctl shortcuts   # check Super+Shift+V/U/D for conflicts
+vaultctl open                    # open the dashboard, signed in
+vaultctl users                   # list accounts; `vaultctl users add ann --role family`
+vaultctl storage                 # your Vault drive and drives you could use
+vaultctl doctor                  # check everything
 ```
 
 Try it without installing, on any Linux machine:
 
 ```sh
 make all
-./bin/vaultd --demo    # sample drives and shortcuts, clearly labelled
+./bin/vaultd --demo    # sample drives in a throwaway sandbox, clearly labelled
 ```
 
 Developing? See [docs/development.md](docs/development.md).
@@ -91,11 +84,11 @@ Developing? See [docs/development.md](docs/development.md).
  browser / phone ──► vaultd (Go, 127.0.0.1:8788) ──► read-only system tools
                        │  REST API + embedded React UI    lsblk · findmnt · smartctl · hyprctl
                        │
- vaultctl (CLI) ───────┤  later: SFTPGo (files, users) · mergerfs (pooling)
+ vaultctl (CLI) ───────┤  SFTPGo (Files, per-user folders) · later: mergerfs (pooling)
  Omarchy plugin (QML) ─┘         cloudflared (remote) · privileged helper (narrow, allowlisted)
 ```
 
-One Go binary serves the API and the dashboard. SQLite (from Milestone 4) holds tokens, shares and activity, never files. Details: [ARCHITECTURE.md](ARCHITECTURE.md).
+One Go binary serves the API and the dashboard, and supervises SFTPGo (the file engine) as a child process on 127.0.0.1:8789, reachable only through Vault's sign-in at `/files/`. SQLite (from Milestone 4) holds tokens, shares and activity, never files. Details: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Safety model
 
@@ -103,7 +96,8 @@ One Go binary serves the API and the dashboard. SQLite (from Milestone 4) holds 
 - **The system disk is always protected.** Any drive backing `/`, `/boot`, EFI, `/usr`, `/var`, `/home` or swap is marked SYSTEM · PROTECTED. If Vault cannot identify the system disk, it offers no drive at all.
 - **Unplugged drives can't fill your system disk.** Vault checks the drive's UUID and the kernel mount table before every use. If the drive is gone, the Vault shows as offline instead of writing into an empty folder.
 - **Adopting a drive only adds folders.** Existing files are never moved, renamed or deleted. "Stop using this drive" only forgets it.
-- **Local by default.** The service binds to `127.0.0.1` and rejects unknown `Host` headers (DNS-rebinding protection). Changes need a token that only your user can read. Remote access is opt-in and goes through a tunnel.
+- **Accounts done carefully.** Passwords are argon2id hashes, sign-in locks out after repeated failures, two-factor is optional, and disabling someone signs them out immediately. Family and guests only see the folders you give them.
+- **Local by default.** The service binds to `127.0.0.1` and rejects unknown `Host` headers (DNS-rebinding protection). SFTP and WebDAV are off. Remote access is opt-in and goes through a tunnel.
 - **No shell from the web.** There is no command-execution endpoint. Vault runs a short allowlist of read-only tools, without a shell.
 - **Shortcuts are never overwritten.** Conflicts are reported with options: choose another, copy the binding, or skip.
 
@@ -119,6 +113,10 @@ Beam and Vault are separate projects. Vault does not depend on Beam and does not
 |---|---|
 | ![Choose a drive](docs/screenshots/setup-storage.png) | ![Create your Vault](docs/screenshots/setup-vault.png) |
 
+| Users | Files (a family member's view) |
+|---|---|
+| ![Users](docs/screenshots/users.png) | ![Files](docs/screenshots/files-family.png) |
+
 | Storage | Phone |
 |---|---|
 | ![Storage page](docs/screenshots/storage.png) | ![Ready on a phone](docs/screenshots/setup-ready-phone.png) |
@@ -129,7 +127,7 @@ Screenshots use `--demo` data.
 
 1. ✅ Foundation: dashboard, read-only drive discovery, shortcut planning
 2. ✅ Single-drive Vault, config, `/srv/vault`, system disk protection
-3. SFTPGo files and users
+3. ✅ SFTPGo files and users
 4. Upload to Vault (Super+Shift+U), QR, mobile upload page
 5. Download from Vault (Super+Shift+D), file picker, mobile download page
 6. Remote access through Cloudflare Tunnel

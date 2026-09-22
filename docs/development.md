@@ -45,9 +45,29 @@ VAULT_ADDR=http://127.0.0.1:9000 ./bin/vaultctl status
 - API types in `web/src/api.ts` mirror the Go structs; update both together.
 - The dashboard uses no external fonts, scripts or images (CSP is `default-src 'self'`).
 
+## The file service in development
+
+Files needs SFTPGo. Build it once (it goes to `~/.local/share/omarchy-vault/sftpgo`, where vaultd finds it):
+
+```sh
+make sftpgo
+```
+
+Or point vaultd at another build with `VAULT_SFTPGO=/path/to/sftpgo VAULT_SFTPGO_ASSETS=/dir/with/templates-and-static`.
+
+The integration test runs SFTPGo for real:
+
+```sh
+VAULT_TEST_SFTPGO=~/.local/share/omarchy-vault/sftpgo/bin/sftpgo \
+VAULT_TEST_SFTPGO_ASSETS=~/.local/share/omarchy-vault/sftpgo \
+go test ./internal/files -run Integration -v
+```
+
+Note: SFTPGo's web assets need its `static/vendor` directory, which Go module downloads strip. Always build from the git tag (the script does).
+
 ## Demo mode
 
-`vaultd --demo` serves sample drives. The sample "WD Red" and USB stick are real folders in a throwaway sandbox under `~/.cache/omarchy-vault/demo-*`, so you can click through setup and it really creates folders. Your real config, token and `/srv/vault` are never touched, and the sandbox is deleted when vaultd exits. Capacity shown after setup is the capacity of the disk holding the sandbox.
+`vaultd --demo` serves sample drives. The sample "WD Red" and USB stick are real folders in a throwaway sandbox under `~/.cache/omarchy-vault/demo-*`, so you can click through setup and it really creates folders. Accounts and SFTPGo state live in the sandbox too. Sign-in is skipped until the sandbox's first account exists, then it behaves like the real thing. Your real config, users, token and `/srv/vault` are never touched, and the sandbox is deleted when vaultd exits. Capacity shown after setup is the capacity of the disk holding the sandbox.
 
 If your home directory is under a location Vault refuses as storage (for example `/root` in a container), point the sandbox elsewhere: `XDG_CACHE_HOME=/home/you/.cache ./bin/vaultd --demo`.
 

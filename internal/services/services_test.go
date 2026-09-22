@@ -11,7 +11,6 @@ func TestUnitStateOnlyQueriesKnownUnits(t *testing.T) {
 	fake := &sysexec.Fake{
 		Installed: map[string]bool{"systemctl": true},
 		Outputs: map[string][]byte{
-			"systemctl is-active sftpgo.service":               []byte("active\n"),
 			"systemctl is-active cloudflared.service":          []byte("inactive\n"),
 			"systemctl is-active smb.service":                  []byte("inactive\n"),
 			"systemctl --user is-active omarchy-vault.service": []byte("active\n"),
@@ -36,8 +35,13 @@ func TestUnitStateOnlyQueriesKnownUnits(t *testing.T) {
 		}
 	}
 	for _, c := range comps {
-		if c.ID == "sftpgo" && c.UnitState != "active" {
-			t.Errorf("sftpgo state = %q", c.UnitState)
+		if c.ID == "cloudflared" && c.UnitState != "inactive" {
+			t.Errorf("cloudflared state = %q", c.UnitState)
+		}
+	}
+	for _, c := range MarkFiles(comps, true, true, "/home/me/.local/share/omarchy-vault/sftpgo/bin/sftpgo") {
+		if c.ID == "sftpgo" && (!c.Installed || c.UnitState != "active") {
+			t.Errorf("files = %+v", c)
 		}
 	}
 	for _, c := range MarkSelfRunning(comps) {

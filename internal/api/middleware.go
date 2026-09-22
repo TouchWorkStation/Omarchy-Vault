@@ -17,9 +17,19 @@ const maxBodyBytes = 1 << 20 // API request bodies; uploads get their own limit 
 const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
 	"font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
+// isFiles reports requests for SFTPGo's web client, which sets its own
+// security headers and handles large uploads itself.
+func isFiles(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, "/files/") }
+
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
+		if isFiles(r) {
+			h.Set("X-Content-Type-Options", "nosniff")
+			h.Set("Referrer-Policy", "no-referrer")
+			next.ServeHTTP(w, r)
+			return
+		}
 		h.Set("Content-Security-Policy", contentSecurityPolicy)
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
@@ -96,7 +106,7 @@ func (g *hostGuard) wrap(next http.Handler) http.Handler {
 
 func limitBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Body != nil {
+		if r.Body != nil && !isFiles(r) {
 			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 		}
 		next.ServeHTTP(w, r)
@@ -202,6 +212,12 @@ func (l *rateLimiter) wrap(next http.Handler) http.Handler {
 		key, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
 			key = r.RemoteAddr
+		}
+		// The file browser loads many assets at once; it is behind Vault's
+		// sign-in and SFTPGo's own limits.
+		if isFiles(r) {
+			next.ServeHTTP(w, r)
+			return
 		}
 		if !l.allow(key) {
 			w.Header().Set("Retry-After", "1")

@@ -7,10 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/config"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/files"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
 )
 
@@ -61,7 +63,9 @@ func (a *app) doctor(ctx context.Context) int {
 
 	// Daemon and port.
 	var st map[string]any
-	if err := a.getJSON(ctx, "/api/status", &st); err == nil {
+	daemonUp := false
+	if err := a.getJSON(ctx, "/api/session", &st); err == nil {
+		daemonUp = true
 		add("daemon", lvOK, "Vault service is answering on http://%s", a.cfg.Listen)
 	} else {
 		conn, dErr := net.DialTimeout("tcp", a.cfg.Listen, time.Second)
@@ -116,7 +120,6 @@ func (a *app) doctor(ctx context.Context) int {
 		{"lsblk", "util-linux", "drive discovery", true, 1},
 		{"findmnt", "util-linux", "system drive detection", true, 1},
 		{"smartctl", "smartmontools", "drive health", false, 1},
-		{"sftpgo", "sftpgo", "file browser and users", false, 3},
 		{"mergerfs", "mergerfs", "combining drives", false, 7},
 		{"cloudflared", "cloudflared", "remote access", false, 6},
 	}
@@ -152,6 +155,49 @@ func (a *app) doctor(ctx context.Context) int {
 			add("health", lvFail, "%d drive(s) report CRITICAL health; run: vaultctl disks", inv.Summary.Critical)
 		} else if inv.Summary.Warning > 0 {
 			add("health", lvWarn, "%d drive(s) report warnings; run: vaultctl disks", inv.Summary.Warning)
+		}
+	}
+
+	// Files (SFTPGo, run by Vault).
+	if dh, err := files.DataHome(); err == nil {
+		if bin, _, err := files.Locate(dh); err != nil {
+			add("files", lvWarn, "file service not installed; run: ./scripts/build-sftpgo.sh")
+		} else {
+			var fst struct {
+				State   string `json:"state"`
+				Message string `json:"message"`
+			}
+			switch {
+			case !daemonUp:
+				add("files", lvInfo, "installed (%s); starts with the Vault service", bin)
+			case a.call(ctx, "GET", "/api/files", nil, &fst) != nil:
+				add("files", lvInfo, "installed (%s)", bin)
+			case fst.State == "running":
+				add("files", lvOK, "running")
+			case fst.State == "error":
+				add("files", lvFail, "%s", fst.Message)
+			default:
+				add("files", lvInfo, "%s", strings.TrimSpace(strings.ReplaceAll(fst.State, "_", " ")+". "+fst.Message))
+			}
+		}
+	}
+
+	// Accounts.
+	var ul userList
+	if daemonUp && a.call(ctx, "GET", "/api/users", nil, &ul) == nil {
+		if len(ul.Users) == 0 {
+			add("accounts", lvWarn, "no accounts yet; create yours with: vaultctl users add <name>")
+		} else {
+			add("accounts", lvOK, "%d account(s)", len(ul.Users))
+		}
+	}
+
+	// Keep running after logout (needed for a headless / always-on Vault).
+	if u := os.Getenv("USER"); u != "" && u != "root" {
+		if _, err := os.Stat("/var/lib/systemd/linger/" + u); err == nil {
+			add("always on", lvOK, "Vault keeps running when you log out")
+		} else {
+			add("always on", lvInfo, "Vault stops when you log out; to keep it running: sudo loginctl enable-linger %s", u)
 		}
 	}
 

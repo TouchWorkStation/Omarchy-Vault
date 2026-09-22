@@ -42,21 +42,58 @@ A root-level attacker on the machine, physical theft of unencrypted drives (use 
 
 1. **Network → vaultd.** Everything from the network is untrusted. vaultd binds to `127.0.0.1:8788`. Listening elsewhere requires `security.allow_non_loopback_listen: true` in config.
 2. **vaultd → system.** vaultd runs as the desktop user and can only execute an allowlisted set of binaries (`internal/sysexec`): `lsblk`, `findmnt`, `blkid`, `smartctl`, `hyprctl`, `systemctl`. No shell is ever used. Arguments are fixed in code; the only discovered value passed as an argument (a device path for `smartctl`) must match `^/dev/[a-z0-9_-]+$`.
-3. **Other local users → vaultd.** Anyone on the machine can reach `127.0.0.1:8788`. Read-only endpoints are open to them; every state-changing endpoint needs proof of being the desktop user (see "Local write authorization").
-4. **vaultd → privileged helper** (planned, Milestone 7). See below.
+3. **Other local users → vaultd.** Anyone on the machine can reach `127.0.0.1:8788`. Before the first account exists they can only read; afterwards they need a Vault account (see "Accounts and sign-in").
+4. **vaultd → SFTPGo.** A child process on 127.0.0.1:8789, managed through its admin REST API (see "File service trust boundary").
+5. **vaultd → privileged helper** (planned, Milestone 7). See below.
 
-## Local write authorization (Milestone 2)
+## Accounts and sign-in (Milestone 3)
 
-Until user accounts exist (Milestone 3), Vault trusts whoever can read `~/.config/omarchy-vault/secrets/local-token`. The file holds 32 random bytes. It is mode 0600 inside a 0700 folder, and vaultd tightens it if loosened. vaultd creates it on first start.
+- **Accounts** live in `~/.config/omarchy-vault/users.json` (0600). Each has an argon2id hash (46 MiB, t=1, p=1, 16-byte salt, PHC format). Plaintext passwords are never stored or logged. Hashing runs at most two at a time, to bound memory.
+- **Sign-in** (`POST /api/auth/login`):
+  - A wrong password and an unknown username give the same answer, and take the same time (a dummy hash is verified for unknown users).
+  - After 5 failures for a username *or* client address, sign-in for it pauses for 1 minute, doubling up to 15 minutes. Success clears the pause.
+  - Disabled accounts cannot sign in.
+- **Two-factor:** optional TOTP (RFC 6238, SHA-1, 6 digits, ±30 s). The last accepted time step is stored, so a code can never be reused. Turning it off needs the password.
+- **Sessions:**
+  - A new random session id is issued on every sign-in (no fixation). Only its hash is kept server-side.
+  - The cookie is HttpOnly and SameSite=Strict, lasts 12 hours, and becomes Secure over TLS.
+  - Every request re-checks the account. A disabled, deleted or role-changed user loses access on their next request.
+  - A password change or reset signs the user out everywhere.
+- **CSRF:** cookie-authenticated writes must carry `X-Vault-Request: 1`. That custom header forces a CORS preflight, which Vault never approves. It comes on top of the Origin, Sec-Fetch-Site and Host checks and SameSite=Strict.
+- **Roles** are enforced server-side on every endpoint:
+  - Admin: everything.
+  - Family and guest: status, their own account, and Files.
+- **Last admin:** Vault refuses to disable, demote or delete the last active admin.
+- **Before the first account exists**, reads are open on loopback (for first-run setup) and writes need the local token. Afterwards, everything except sign-in needs a session.
 
-- **CLI:** `vaultctl` sends the token in `X-Vault-Token`. Comparison is constant time.
-- **Browser:** the token never reaches a browser.
-  1. `vaultctl open` (and the Super+Shift+V shortcut) exchanges the token for a login code. The code is random, single-use, stored only as a hash, and valid for 30 seconds.
-  2. It opens `/login?code=…`.
-  3. That page sets a `vault_session` cookie: HttpOnly, SameSite=Strict, 12 hours, stored server-side as a hash. It becomes Secure once served over TLS.
-- **CSRF:** cookie-authenticated writes must also send `X-Vault-Request: 1`. That custom header forces a CORS preflight, which Vault never approves. The Origin, Sec-Fetch-Site and Host checks still apply.
-- **Known limit:** the login code appears on `xdg-open`'s command line for a moment. Another local user could only use it by racing the browser within 30 seconds, and only once.
-- **Demo mode** skips this check because every write goes to a throwaway sandbox under `~/.cache/omarchy-vault/demo-*`.
+### Local owner access
+
+The local token (`~/.config/omarchy-vault/secrets/local-token`: 32 random bytes, 0600 in a 0700 folder) identifies the desktop owner:
+
+- `vaultctl` sends it as `X-Vault-Token` and acts as an admin. This is how you recover a forgotten admin password: `vaultctl users reset-password <name>`.
+- `vaultctl open` exchanges it for a single-use, 30-second login code, then opens `/login?code=…`. The browser gets a session and never sees the token.
+- Other Unix users on the machine can reach 127.0.0.1:8788 but cannot read the token, so they cannot change anything and, once accounts exist, cannot read anything either.
+- Known limit: the login code appears on `xdg-open`'s command line for a moment. It works once, and only within 30 seconds.
+- Demo mode (`vaultd --demo`) skips sign-in until its sandbox has an account; it never touches real config.
+
+## File service (SFTPGo) trust boundary (Milestone 3)
+
+- **Build:** SFTPGo v2.7.6 is built from the official repository, at a tag that must resolve to commit `62ae9ba3957e9ed52b44a4f885e805e2d7b35972`. The build refuses anything else. It installs into the user's home folder; no root is involved.
+- **Process:** vaultd runs it as a child process, as the same user, with `Pdeathsig`. It is stopped whenever storage is not ready. Its configuration comes only from environment variables set by Vault:
+  - HTTP listens on 127.0.0.1:8789 only.
+  - Web admin, OpenAPI, SFTP, FTP, WebDAV and telemetry are off.
+- **Admin credentials:** SFTPGo's admin password and JWT signing key are random, stored 0600 in `secrets/`, and never shown or logged. SFTPGo's own error lines are relayed to Vault's log. Its per-request access lines are not.
+- **Users:** Vault mirrors each account into SFTPGo by sending the argon2id *hash*, never the password.
+  - Family and guest users get an empty private home, plus virtual folders for exactly the folders granted.
+  - Permissions are explicit lists (`list, download, upload, overwrite, delete, rename, create_dirs`): no symlink creation, chmod, chown or chtimes.
+  - Guests get only `list, download` and write-disabled.
+  - SSH, FTP and WebDAV are denied per user.
+  - Web-client password change, password reset, MFA, API keys and shares are disabled; Vault owns those.
+  - SFTPGo users Vault did not create are never modified or deleted.
+- **Proxy:** Files is reached only through `/files/` on Vault. The proxy requires a Vault session, so Vault's sign-in, lockout and 2FA protect Files as well.
+  - Only SFTPGo's own `jwt` cookie is forwarded upstream. Vault's session cookie and headers are stripped.
+  - At sign-in, Vault signs the user into the web client on their behalf. The resulting cookie is HttpOnly, SameSite=Strict and scoped to `/files/web/client`, and SFTPGo binds it to 127.0.0.1.
+- **Offline drive:** SFTPGo's home paths go through the data link. When the drive is missing, Vault removes the link and stops SFTPGo, so nothing can be written to the system disk.
 
 ## Privileged helper model
 
@@ -101,7 +138,7 @@ Implemented in Milestone 1 (`internal/api/middleware.go`, tested):
 - **Limits**: 1 MB API bodies, 64 KB headers, read/write timeouts.
 - **Static files** are served from the embedded build only; there is no path from a URL to the host filesystem.
 
-Planned: authentication (M3) with argon2id password hashes, optional TOTP 2FA, session rotation on login, lockout with backoff.
+Authentication (M3) is described in "Accounts and sign-in" above.
 
 ## Path safety (from Milestone 3)
 

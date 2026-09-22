@@ -22,6 +22,11 @@ for f in "$HOME/.local/bin/vaultd" "$HOME/.local/bin/vaultctl" "$UNIT"; do
   [[ -e "$f" ]] && run rm -f "$f"
 done
 [[ -d "$DATA_DIR/plugin" ]] && run rm -rf "$DATA_DIR/plugin"
+# The file service program (its database with your users stays).
+for d in bin templates static; do
+  [[ -d "$DATA_DIR/sftpgo/$d" ]] && run rm -rf "$DATA_DIR/sftpgo/$d"
+done
+[[ -f "$DATA_DIR/sftpgo/VERSION" ]] && run rm -f "$DATA_DIR/sftpgo/VERSION"
 run systemctl --user daemon-reload || true
 
 # Remove /srv/vault only if it is Vault's own shortcut.

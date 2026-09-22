@@ -116,9 +116,46 @@ export interface PoolResponse {
   notes?: string[];
 }
 
+export type Role = "admin" | "family" | "guest";
+
+export interface FolderGrant {
+  name: string;
+  access: "rw" | "ro";
+}
+
+export interface UserView {
+  username: string;
+  role: Role;
+  disabled: boolean;
+  folders: FolderGrant[];
+  all_folders: boolean;
+  totp_enabled: boolean;
+  created_at: string;
+}
+
 export interface Session {
+  signed_in: boolean;
   can_change: boolean;
+  user?: UserView;
+  local: boolean;
+  accounts_exist: boolean;
+  files_signed_in: boolean;
+  demo?: boolean;
   hint?: string;
+}
+
+export interface UsersResponse {
+  users: UserView[];
+  folders: string[];
+}
+
+export interface FilesStatus {
+  state: "not_installed" | "waiting_for_storage" | "starting" | "running" | "error";
+  installed: boolean;
+  running: boolean;
+  url: string;
+  message?: string;
+  signed_in?: boolean;
 }
 
 export interface Candidate {
@@ -169,7 +206,8 @@ export interface Status {
   drives_error?: string;
   system_disk_detected: boolean;
   remote: { enabled: boolean; domain?: string; state: string; milestone: number };
-  users: { count: number | null; milestone: number };
+  users: { count: number };
+  files: FilesStatus;
   services: Service[];
   shortcuts: ShortcutBrief[];
   warnings?: string[];
@@ -225,6 +263,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code = "",
   ) {
     super(message);
   }
@@ -234,8 +273,15 @@ export async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   return request<T>("GET", path, undefined, signal);
 }
 
+// Called when the server says the session is gone, so the app can show the
+// sign-in screen instead of a wall of errors.
+let onSignedOut: (() => void) | undefined;
+export function setSignedOutHandler(fn: () => void) {
+  onSignedOut = fn;
+}
+
 // Writes carry X-Vault-Request so a cross-site page can never forge them.
-export async function send<T>(method: "POST" | "DELETE", path: string, body?: unknown): Promise<T> {
+export async function send<T>(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
   return request<T>(method, path, body);
 }
 
@@ -258,13 +304,16 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
   }
   if (!res.ok) {
     let msg = `Request failed (${res.status})`;
+    let code = "";
     try {
       const body = await res.json();
       if (body?.message) msg = body.message;
+      if (body?.error) code = body.error;
     } catch {
       /* not JSON */
     }
-    throw new ApiError(res.status, msg);
+    if (res.status === 401 && code === "login_required") onSignedOut?.();
+    throw new ApiError(res.status, msg, code);
   }
   return res.json() as Promise<T>;
 }

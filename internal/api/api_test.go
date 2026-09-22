@@ -157,7 +157,6 @@ func TestCrossSiteWritesRefused(t *testing.T) {
 func TestPlannedEndpointsAre501(t *testing.T) {
 	h := testServer(t)
 	cases := map[string]string{
-		"/api/users":                    "POST",
 		"/api/upload-session":           "POST",
 		"/api/download-session":         "POST",
 		"/api/share":                    "POST",

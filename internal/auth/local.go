@@ -118,19 +118,33 @@ func hash(s string) string {
 	return string(h[:])
 }
 
+// Identity is who a session belongs to.
+type Identity struct {
+	Username string `json:"username"`
+	Role     string `json:"role"`
+	// Local is true for sessions opened from this computer with the local
+	// token (vaultctl open) rather than a password.
+	Local bool `json:"local"`
+}
+
+type entry struct {
+	exp time.Time
+	id  Identity
+}
+
 // Local manages login codes and browser sessions. Only hashes are kept.
 type Local struct {
 	Token string
 	Now   func() time.Time
 
 	mu       sync.Mutex
-	codes    map[string]time.Time
-	sessions map[string]time.Time
+	codes    map[string]entry
+	sessions map[string]entry
 }
 
 // NewLocal returns a Local for token.
 func NewLocal(token string) *Local {
-	return &Local{Token: token, codes: map[string]time.Time{}, sessions: map[string]time.Time{}}
+	return &Local{Token: token, codes: map[string]entry{}, sessions: map[string]entry{}}
 }
 
 func (l *Local) now() time.Time {
@@ -141,13 +155,13 @@ func (l *Local) now() time.Time {
 }
 
 func (l *Local) gc(now time.Time) {
-	for k, exp := range l.codes {
-		if now.After(exp) {
+	for k, e := range l.codes {
+		if now.After(e.exp) {
 			delete(l.codes, k)
 		}
 	}
-	for k, exp := range l.sessions {
-		if now.After(exp) {
+	for k, e := range l.sessions {
+		if now.After(e.exp) {
 			delete(l.sessions, k)
 		}
 	}
@@ -156,8 +170,8 @@ func (l *Local) gc(now time.Time) {
 // CheckToken reports whether tok is the local token.
 func (l *Local) CheckToken(tok string) bool { return Equal(tok, l.Token) }
 
-// NewCode issues a single-use login code.
-func (l *Local) NewCode() (string, time.Duration, error) {
+// NewCode issues a single-use login code that signs in as id.
+func (l *Local) NewCode(id Identity) (string, time.Duration, error) {
 	code, err := Random(24)
 	if err != nil {
 		return "", 0, err
@@ -169,52 +183,75 @@ func (l *Local) NewCode() (string, time.Duration, error) {
 	if len(l.codes) >= maxCodes {
 		return "", 0, errors.New("auth: too many pending login codes")
 	}
-	l.codes[hash(code)] = now.Add(codeTTL)
+	l.codes[hash(code)] = entry{exp: now.Add(codeTTL), id: id}
 	return code, codeTTL, nil
 }
 
-// Redeem consumes a login code and returns a new session id.
-func (l *Local) Redeem(code string) (string, time.Duration, bool) {
+// Redeem consumes a login code and opens a session for its identity.
+func (l *Local) Redeem(code string) (string, time.Duration, Identity, bool) {
 	if code == "" {
-		return "", 0, false
+		return "", 0, Identity{}, false
+	}
+	l.mu.Lock()
+	h := hash(code)
+	e, ok := l.codes[h]
+	now := l.now()
+	if ok {
+		delete(l.codes, h) // single use
+	}
+	l.mu.Unlock()
+	if !ok || now.After(e.exp) {
+		return "", 0, Identity{}, false
+	}
+	sid, ttl, err := l.NewSession(e.id)
+	if err != nil {
+		return "", 0, Identity{}, false
+	}
+	return sid, ttl, e.id, true
+}
+
+// NewSession opens a session for id and returns its id.
+func (l *Local) NewSession(id Identity) (string, time.Duration, error) {
+	sid, err := Random(32)
+	if err != nil {
+		return "", 0, err
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := l.now()
 	l.gc(now)
-	h := hash(code)
-	if _, ok := l.codes[h]; !ok {
-		return "", 0, false
-	}
-	delete(l.codes, h) // single use
-	sid, err := Random(32)
-	if err != nil {
-		return "", 0, false
-	}
 	if len(l.sessions) >= maxSessions {
-		// Drop the session closest to expiry.
 		var oldest string
 		var oldestExp time.Time
-		for k, exp := range l.sessions {
-			if oldest == "" || exp.Before(oldestExp) {
-				oldest, oldestExp = k, exp
+		for k, e := range l.sessions {
+			if oldest == "" || e.exp.Before(oldestExp) {
+				oldest, oldestExp = k, e.exp
 			}
 		}
 		delete(l.sessions, oldest)
 	}
-	l.sessions[hash(sid)] = now.Add(sessionTTL)
-	return sid, sessionTTL, true
+	l.sessions[hash(sid)] = entry{exp: now.Add(sessionTTL), id: id}
+	return sid, sessionTTL, nil
+}
+
+// Session returns the identity of a live session.
+func (l *Local) Session(sid string) (Identity, bool) {
+	if sid == "" {
+		return Identity{}, false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	e, ok := l.sessions[hash(sid)]
+	if !ok || !l.now().Before(e.exp) {
+		return Identity{}, false
+	}
+	return e.id, true
 }
 
 // ValidSession reports whether sid is a live session.
 func (l *Local) ValidSession(sid string) bool {
-	if sid == "" {
-		return false
-	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	exp, ok := l.sessions[hash(sid)]
-	return ok && l.now().Before(exp)
+	_, ok := l.Session(sid)
+	return ok
 }
 
 // EndSession removes sid.
@@ -222,4 +259,16 @@ func (l *Local) EndSession(sid string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	delete(l.sessions, hash(sid))
+}
+
+// EndSessionsFor signs a user out everywhere (after a password reset,
+// role change or when the account is disabled).
+func (l *Local) EndSessionsFor(username string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for k, e := range l.sessions {
+		if e.id.Username == username {
+			delete(l.sessions, k)
+		}
+	}
 }

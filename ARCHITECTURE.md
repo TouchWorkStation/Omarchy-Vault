@@ -19,7 +19,10 @@ Omarchy Vault is one small Go daemon (`vaultd`), a CLI (`vaultctl`), a React das
 │  internal/disks      lsblk + findmnt → inventory, system disk       │
 │  internal/health     smartctl JSON → Healthy/Warning/Critical       │
 │  internal/storage    adoption, live state, /srv/vault link          │
-│  internal/auth       local token, login codes, sessions             │
+│  internal/auth       argon2id, TOTP, lockout, token, sessions       │
+│  internal/users      accounts, roles, folder grants (users.json)    │
+│  internal/files      SFTPGo supervisor, admin client, user sync     │
+│  internal/qrsvg      QR codes as SVG (2FA now, transfers later)     │
 │  internal/services   which tools/units exist (read-only)            │
 │  internal/shortcuts  Hyprland binding conflict analysis             │
 │  internal/config     ~/.config/omarchy-vault/config.json            │
@@ -28,7 +31,7 @@ Omarchy Vault is one small Go daemon (`vaultd`), a CLI (`vaultctl`), a React das
 └───────┬─────────────────────────────┬───────────────────────────────┘
         │ read-only exec (no shell)   │ later milestones
         ▼                             ▼
-  lsblk · findmnt · smartctl     SFTPGo (files, users, WebDAV, SFTP)   M3
+  lsblk · findmnt · smartctl     SFTPGo child, 127.0.0.1:8789 (Files)  M3
   hyprctl · systemctl is-active  SQLite (tokens, shares, activity)     M4
                                  vault-helper (privileged, allowlist)  M7
                                  mergerfs · cloudflared · samba        M6/M7
@@ -64,12 +67,36 @@ Omarchy Vault is one small Go daemon (`vaultd`), a CLI (`vaultctl`), a React das
 
 ~/.config/omarchy-vault/
   config.json               0600, no secrets; sources[] = {path, folder, uuid, volume, label}
+  users.json                0600, accounts (argon2id hashes, roles, folders, TOTP)
   secrets/                  0700
-    local-token             0600, CLI write authorization
+    local-token             0600, owner access for vaultctl
+    sftpgo-admin            0600, SFTPGo admin password (random)
+    sftpgo-signing          0600, SFTPGo JWT signing key (random)
+
+~/.local/share/omarchy-vault/
+  current                   → the Vault folder on the drive (removed while offline)
+  sftpgo/bin, templates/, static/   the file service (scripts/build-sftpgo.sh)
+  sftpgo/data/              SFTPGo database
+  homes/<user>/             empty private homes for family and guests
   vault.db                  SQLite from Milestone 4: tokens (hashed), shares, activity
 ```
 
 Default folders are created only if missing; existing files and folders are never overwritten. In Milestone 7, combining drives mounts a mergerfs pool (FUSE, as the user) and points `current` at it; `/srv/vault` does not change.
+
+## Files and accounts (Milestone 3)
+
+```
+browser ──► vaultd :8788 ──(/files/*, Vault session required)──► SFTPGo :8789 (child process)
+              │                                                     │
+              │ POST /api/auth/login: argon2id + TOTP + lockout     │ web client only
+              │   └─ also signs into SFTPGo, forwards its cookie    │ admin REST API for Vault
+              │                                                     │
+              └─ users.json ──(sync: hashes, roles, folders)───────►┘
+```
+
+- Vault is the source of truth for accounts. `files.Sync` makes SFTPGo match on every change and each time SFTPGo starts.
+- Admins' SFTPGo home is the data link (`~/.local/share/omarchy-vault/current`). Family and guests get an empty home plus one virtual folder per granted top-level folder.
+- `api.RunMonitor` checks storage every 20 s. When the drive is ready it keeps the data link and SFTPGo running; otherwise it removes the link and stops SFTPGo.
 
 ## Data flow: choosing storage (Milestone 2)
 

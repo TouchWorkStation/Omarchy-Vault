@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -21,9 +22,11 @@ import (
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/config"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/demo"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/disks"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/files"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/shortcuts"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/sysexec"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/users"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/version"
 	"github.com/TouchWorkStation/Omarchy-Vault/web"
 )
@@ -51,6 +54,13 @@ func run() error {
 	}
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	// A soft heap limit keeps vaultd small on a desktop: memory from bursts
+	// such as password hashing is returned to the OS promptly. It is a
+	// target, not a cap; Vault keeps working above it. GOMEMLIMIT overrides.
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(48 << 20)
+	}
 
 	if os.Geteuid() == 0 {
 		log.Warn("vaultd is running as root; it is designed to run as your user (see SECURITY.md)")
@@ -107,6 +117,35 @@ func run() error {
 		return fmt.Errorf("local token: %w", err)
 	}
 
+	userStore, err := users.Open(filepath.Join(filepath.Dir(cfgPathLive), "users.json"))
+	if err != nil {
+		return err
+	}
+
+	// The file service (SFTPGo). Its state lives beside Vault's own; in
+	// demo mode everything stays inside the sandbox.
+	dataHome, err := files.DataHome()
+	if err != nil {
+		return err
+	}
+	stateBase := filepath.Join(dataHome, "omarchy-vault")
+	if *demoMode {
+		stateBase = filepath.Dir(dataLink)
+	}
+	fp := files.Paths{
+		ConfigDir:  filepath.Join(stateBase, "sftpgo", "config"),
+		DataDir:    filepath.Join(stateBase, "sftpgo", "data"),
+		HomesDir:   filepath.Join(stateBase, "homes"),
+		SecretsDir: secretsDir,
+	}
+	if bin, assets, err := files.Locate(dataHome); err == nil {
+		fp.Binary, fp.Assets = bin, assets
+		log.Info("file service found", "sftpgo", bin)
+	} else {
+		log.Warn("file service (SFTPGo) not installed; Files is unavailable until it is (run scripts/install.sh)")
+	}
+	fileMgr := files.NewManager(fp, log)
+
 	static, built := web.Dist()
 	if !built {
 		log.Warn("web UI not built into this binary; run `make web && make build`")
@@ -121,6 +160,8 @@ func run() error {
 		DataLink:    dataLink,
 		Mounts:      mounts,
 		Auth:        auth.NewLocal(token),
+		Users:       userStore,
+		Files:       fileMgr,
 		Disks:       &disks.Scanner{Run: run, SMART: !*noSMART},
 		Run:         run,
 		Shortcuts: shortcuts.Inspector{
@@ -149,6 +190,14 @@ func run() error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Background workers: the file service and the storage monitor that
+	// starts/stops it as the drive comes and goes.
+	fileMgr.OnReady = srv.SyncFiles
+	workers := make(chan struct{})
+	go func() { fileMgr.Run(ctx); close(workers) }()
+	go srv.RunMonitor(ctx, 20*time.Second)
+	defer func() { stop(); <-workers }()
 
 	errCh := make(chan error, 1)
 	go func() {

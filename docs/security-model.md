@@ -21,6 +21,15 @@ The full threat model is in [../SECURITY.md](../SECURITY.md). This page is the s
 | Unplugged/moved drives never written to | `storage.Inspect` (UUID + mountinfo) |
 | Config written atomically, 0600 | `config.Save` |
 | Never replace real files/folders with links | `storage.SetLink`, `vaultctl link` |
+| Passwords: argon2id, policy, bounded concurrency | `auth.HashPassword`, `auth.ValidatePassword` |
+| Sign-in lockout per user and per client | `auth.LoginLimiter`, `api.handlePasswordLogin` |
+| TOTP with replay protection | `auth.VerifyTOTP` (+ `users.User.TOTPLast`) |
+| Role checks on every endpoint; account re-checked per request | `api.gate`, `api.identity` |
+| Last admin can never be removed | `users.Store.Update/Delete` |
+| SFTPGo: loopback, other protocols off, explicit permissions | `files.Manager.env`, `files.Desired` |
+| Files only behind Vault sign-in; Vault cookies stripped upstream | `api.filesProxy` |
+| SFTPGo stopped and data link removed when the drive is offline | `api.checkStorage` |
+| Pinned, verified SFTPGo source | `scripts/build-sftpgo.sh` |
 | Tokens redacted from logs | `api.redactPath` |
 | Secrets never in config.json or git | config schema, `.gitignore` |
 

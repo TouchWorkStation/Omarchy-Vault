@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/config"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/disks"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/shortcuts"
@@ -42,7 +43,14 @@ Commands:
                   Stop using the drive (files stay where they are)
   link            Create the /srv/vault shortcut (asks for sudo once)
   pool status     How drives are combined
-  users           Vault users                          (Milestone 3)
+  users                        List Vault users
+  users add <name> [--role admin|family|guest] [--folders "Photos,Documents:ro"]
+                               Create a user (asks for the password)
+  users disable|enable <name>  Stop or allow someone signing in
+  users reset-password <name>  Set a new password (signs them out)
+  users folders <name> "A,B:ro"  Change which folders they can open
+  users remove <name> [--yes]  Delete the account (never their files)
+  files           File service status and address
   remote status   Remote access status
   upload          Upload to Vault: Phone -> Vault       (Milestone 4)
   download        Download from Vault: Vault -> Phone   (Milestone 5)
@@ -121,7 +129,9 @@ func realMain(args []string) int {
 		}
 		err = a.remoteStatus()
 	case "users":
-		return notYet("User management", 3)
+		err = a.usersCmd(ctx, cmdArgs)
+	case "files":
+		err = a.filesCmd(ctx)
 	case "upload":
 		return notYet("Upload to Vault (Phone -> Vault)", 4)
 	case "download":
@@ -175,6 +185,9 @@ func (a *app) getJSON(ctx context.Context, path string, v any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.baseURL()+path, nil)
 	if err != nil {
 		return err
+	}
+	if tok, err := a.token(); err == nil {
+		req.Header.Set(auth.HeaderToken, tok)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

@@ -5,24 +5,29 @@ import { Storage } from "./pages/Storage";
 import { Settings } from "./pages/Settings";
 import { Planned } from "./pages/Planned";
 import { Setup } from "./pages/Setup";
-import type { Status } from "./api";
+import { SignIn } from "./pages/SignIn";
+import { Files } from "./pages/Files";
+import { Users } from "./pages/Users";
+import { Account } from "./pages/Account";
+import { send, setSignedOutHandler, type Session } from "./api";
 import { useApi } from "./useApi";
 
 export interface Route {
   path: string;
   label: string;
   icon: IconName;
+  admin?: boolean;
 }
 
 export const routes: Route[] = [
   { path: "/", label: "Home", icon: "home" },
   { path: "/files", label: "Files", icon: "files" },
-  { path: "/storage", label: "Storage", icon: "storage" },
+  { path: "/storage", label: "Storage", icon: "storage", admin: true },
   { path: "/upload", label: "Upload", icon: "upload" },
   { path: "/download", label: "Download", icon: "download" },
-  { path: "/users", label: "Users", icon: "users" },
-  { path: "/remote", label: "Remote Access", icon: "remote" },
-  { path: "/settings", label: "Settings", icon: "settings" },
+  { path: "/users", label: "Users", icon: "users", admin: true },
+  { path: "/remote", label: "Remote Access", icon: "remote", admin: true },
+  { path: "/settings", label: "Settings", icon: "settings", admin: true },
 ];
 
 export function navigate(path: string) {
@@ -68,15 +73,12 @@ function Page({ path }: { path: string }) {
       return <Settings />;
     case "/setup":
       return <Setup />;
+    case "/signin":
+      return <Home />;
     case "/files":
-      return (
-        <Planned
-          title="FILES"
-          milestone={3}
-          lead="Browse, upload and download everything in your Vault from any browser."
-          points={["OPEN FILES from here or from your phone", "Folders for Photos, Documents, Backups and more", "SFTP and WebDAV for power users (off by default)"]}
-        />
-      );
+      return <Files />;
+    case "/account":
+      return <Account />;
     case "/upload":
       return (
         <Planned
@@ -100,14 +102,7 @@ function Page({ path }: { path: string }) {
         />
       );
     case "/users":
-      return (
-        <Planned
-          title="USERS"
-          milestone={3}
-          lead="Give family and guests their own sign-in with just the folders they need."
-          points={["Admin · Family · Guest", "Read/write or read-only per folder", "Reset passwords and disable accounts"]}
-        />
-      );
+      return <Users />;
     case "/remote":
       return (
         <Planned
@@ -131,11 +126,31 @@ function Page({ path }: { path: string }) {
 
 export function App() {
   const path = usePath();
-  const { data: status } = useApi<Status>("/api/status");
+  const { data: session, reload: reloadSession } = useApi<Session>("/api/session");
+  useEffect(() => setSignedOutHandler(reloadSession), [reloadSession]);
   useEffect(() => {
     const r = routes.find((x) => x.path === path);
     document.title = r && r.path !== "/" ? `${r.label} · Vault` : "Omarchy Vault";
   }, [path]);
+
+  if (!session) return null;
+  // Once accounts exist, everything is behind sign-in.
+  if (session.accounts_exist && !session.signed_in) {
+    return <SignIn onSignedIn={reloadSession} />;
+  }
+  const isAdmin = session.can_change;
+  const visible = routes.filter((r) => !r.admin || isAdmin);
+  const blocked = routes.find((r) => r.path === path)?.admin && !isAdmin;
+
+  async function signOut() {
+    try {
+      await send("POST", "/api/logout");
+    } finally {
+      window.location.assign("/");
+    }
+  }
+
+  const who = session.user?.username ?? (session.local ? "this computer" : null);
 
   return (
     <div className="shell">
@@ -147,13 +162,26 @@ export function App() {
           <span>VAULT</span>
         </Link>
         <nav aria-label="Primary">
-          {routes.map((r) => (
+          {visible.map((r) => (
             <Link key={r.path} to={r.path} className={`nav-item ${path === r.path ? "active" : ""}`}>
               {icons[r.icon]}
               <span>{r.label}</span>
             </Link>
           ))}
         </nav>
+        {who && (
+          <div className="whoami">
+            <Link to="/account" className={`nav-item ${path === "/account" ? "active" : ""}`}>
+              {icons.users}
+              <span>{who}</span>
+            </Link>
+            {session.signed_in && (
+              <button className="btn btn-small signout" onClick={signOut}>
+                Sign out
+              </button>
+            )}
+          </div>
+        )}
         <p className="tagline">
           Beam moves it.
           <br />
@@ -169,26 +197,42 @@ export function App() {
             <div>That sign-in link expired. Open Vault again with Super+Shift+V or vaultctl open.</div>
           </div>
         )}
-        {status?.demo && (
+        {session.demo && (
           <div className="demo-banner" role="status">
             DEMO MODE · sample drives, not this computer's
           </div>
         )}
-        <Page path={path} />
+        {blocked ? (
+          <section className="page">
+            <h1>ADMINS ONLY</h1>
+            <p className="muted">
+              Ask a Vault admin for help with this. <Link to="/">Go home</Link>.
+            </p>
+          </section>
+        ) : (
+          <Page path={path} />
+        )}
       </main>
       <nav className="tabbar" aria-label="Primary">
         {routes
-          .filter((r) => ["/", "/files", "/upload", "/download", "/storage"].includes(r.path))
+          .filter((r) => ["/", "/files", "/upload", "/download"].includes(r.path))
           .map((r) => (
             <Link key={r.path} to={r.path} className={`tab ${path === r.path ? "active" : ""}`}>
               {icons[r.icon]}
               <span>{r.label}</span>
             </Link>
           ))}
-        <Link to="/settings" className={`tab ${["/settings", "/users", "/remote"].includes(path) ? "active" : ""}`}>
-          {icons.settings}
-          <span>More</span>
-        </Link>
+        {isAdmin ? (
+          <Link to="/settings" className={`tab ${["/settings", "/users", "/remote", "/storage"].includes(path) ? "active" : ""}`}>
+            {icons.settings}
+            <span>More</span>
+          </Link>
+        ) : (
+          <Link to="/account" className={`tab ${path === "/account" ? "active" : ""}`}>
+            {icons.users}
+            <span>Account</span>
+          </Link>
+        )}
       </nav>
     </div>
   );
