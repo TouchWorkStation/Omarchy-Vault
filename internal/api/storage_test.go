@@ -19,19 +19,22 @@ import (
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/shortcuts"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/sysexec"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/transfer"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/users"
 )
 
 const testToken = "test-token-0123456789abcdefghijklmnopqrstuvwxyz"
 
 type env struct {
-	h        http.Handler
-	mount    string
-	cfgPath  string
-	link     string
-	fake     *sysexec.Fake
-	lsblkKey string
-	users    *users.Store
+	h         http.Handler
+	mount     string
+	cfgPath   string
+	link      string
+	fake      *sysexec.Fake
+	lsblkKey  string
+	users     *users.Store
+	transfers *transfer.Store
+	srv       *Server
 }
 
 // newEnv serves a machine with a system NVMe and a data drive "mounted" at
@@ -68,6 +71,12 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	e.users = us
+	ts, err := transfer.Open(filepath.Join(dir, "cfg", "vault.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ts.Close() })
+	e.transfers = ts
 	s := &Server{
 		Config:     cfg,
 		ConfigPath: e.cfgPath,
@@ -75,11 +84,15 @@ func newEnv(t *testing.T) *env {
 		Mounts:     func() (storage.MountTable, error) { return storage.MountTable{"/", mount}, nil },
 		Auth:       auth.NewLocal(testToken),
 		Users:      e.users,
+		Transfers:  e.transfers,
 		Disks:      &disks.Scanner{Run: fake, MinRefresh: time.Nanosecond},
 		Run:        fake,
 		Shortcuts:  shortcuts.Inspector{},
 		Log:        slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
+	s.Transfer = &transfer.Server{Store: e.transfers, Dest: s.TransferDest, Host: "127.0.0.1", Port: -1, Log: s.Log}
+	t.Cleanup(s.Transfer.Stop)
+	e.srv = s
 	e.h = s.Handler()
 	return e
 }

@@ -1,0 +1,26 @@
+:root { --bg:#0b0c0c; --surface:#131515; --border:#2a2e2e; --ink:#d6d8d4; --strong:#f0f1ee; --muted:#8d928e; --accent:#8fbf7f; --bad:#e07a70; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", ui-monospace, Menlo, monospace; font-size: 16px; -webkit-text-size-adjust: 100%; }
+main { max-width: 520px; margin: 0 auto; padding: 24px 16px calc(32px + env(safe-area-inset-bottom)); }
+.brand { letter-spacing: .2em; font-weight: 700; color: var(--strong); font-size: 14px; }
+.mark { color: var(--accent); }
+h1 { font-size: 22px; letter-spacing: .06em; color: var(--strong); margin: 18px 0 4px; }
+h2 { font-size: 15px; letter-spacing: .1em; color: var(--strong); margin: 0 0 12px; }
+.sub { margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.buttons { display: grid; gap: 12px; margin-top: 24px; }
+.big { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 0 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--strong); font-weight: 600; font-size: 17px; cursor: pointer; }
+.big:active { border-color: var(--accent); }
+.big input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.icon { color: var(--accent); width: 22px; text-align: center; font-size: 20px; }
+#progress, #done { margin-top: 24px; padding: 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.meter { height: 10px; border-radius: 5px; background: #1c1f1f; overflow: hidden; }
+#bar { height: 100%; width: 0; background: var(--accent); border-radius: 5px; transition: width .2s; }
+ul { list-style: none; padding: 0; margin: 12px 0 0; max-height: 45vh; overflow: auto; }
+li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+li .ok { color: var(--accent); }
+li .bad { color: var(--bad); }
+button.primary { width: 100%; min-height: 52px; border: 0; border-radius: 10px; background: var(--accent); color: #0b0c0c; font: inherit; font-weight: 700; font-size: 17px; margin-top: 8px; }
+.error { color: var(--bad); border: 1px solid var(--bad); border-radius: 10px; padding: 12px; }

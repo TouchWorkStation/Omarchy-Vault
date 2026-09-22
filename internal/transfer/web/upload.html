@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0c">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Upload to Vault</title>
+<link rel="stylesheet" href="/t/transfer.css">
+</head>
+<body>
+<main id="app" data-expires="{{.Expires}}">
+  <header>
+    <div class="brand"><span class="mark">▣</span> VAULT</div>
+    <h1>UPLOAD TO VAULT</h1>
+    <p class="sub">Phone → Vault · into <strong>{{.Folder}}</strong></p>
+    <p class="muted small" id="expiry"></p>
+  </header>
+
+  <section id="pick" class="buttons">
+    <label class="big"><input type="file" accept="image/*" multiple data-kind="photos"><span class="icon">▦</span>Select Photos</label>
+    <label class="big"><input type="file" accept="image/*" capture="environment" data-kind="camera"><span class="icon">◉</span>Take Photo</label>
+    <label class="big"><input type="file" accept="video/*" multiple data-kind="videos"><span class="icon">▶</span>Select Videos</label>
+    <label class="big"><input type="file" multiple data-kind="files"><span class="icon">▤</span>Choose Files</label>
+  </section>
+
+  <section id="progress" hidden>
+    <h2 id="status">Uploading…</h2>
+    <div class="meter"><div id="bar"></div></div>
+    <p class="muted small" id="counts"></p>
+    <ul id="list"></ul>
+  </section>
+
+  <section id="done" hidden>
+    <h2>✓ UPLOADED</h2>
+    <p id="summary"></p>
+    <p class="muted small">Saved to <strong>Vault › {{.Folder}}</strong></p>
+    <button id="more" class="primary">Upload more</button>
+  </section>
+
+  <p id="error" class="error" role="alert" hidden></p>
+</main>
+<script src="/t/upload.js"></script>
+</body>
+</html>

@@ -35,6 +35,16 @@ type Config struct {
 	Remote      Remote      `json:"remote"`
 	Services    Services    `json:"services"`
 	Security    Security    `json:"security"`
+	Transfer    Transfer    `json:"transfer"`
+}
+
+// Transfer configures how phones reach Vault for QR transfers. The
+// listener only exists while a transfer link is active.
+type Transfer struct {
+	// Host is the address phones use; empty = this computer's LAN address.
+	Host string `json:"host,omitempty"`
+	// Port defaults to 8790.
+	Port int `json:"port,omitempty"`
 }
 
 // Source is a storage location adopted into the Vault.
@@ -208,6 +218,14 @@ func (c Config) Validate() error {
 	}
 	if p.DownloadExpiryMinutes < 1 || p.DownloadExpiryMinutes > 24*60 {
 		errs = append(errs, errors.New("preferences.download_expiry_minutes must be between 1 and 1440"))
+	}
+	if c.Transfer.Port < 0 || c.Transfer.Port > 65535 {
+		errs = append(errs, errors.New("transfer.port must be between 1 and 65535"))
+	}
+	if c.Transfer.Host != "" {
+		if ip := net.ParseIP(c.Transfer.Host); ip == nil || ip.IsLoopback() || ip.IsUnspecified() {
+			errs = append(errs, errors.New("transfer.host must be this computer's LAN IP address"))
+		}
 	}
 	if p.DownloadMaxCount < 0 {
 		errs = append(errs, errors.New("preferences.download_max_count must not be negative"))

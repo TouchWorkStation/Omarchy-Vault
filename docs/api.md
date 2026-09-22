@@ -202,23 +202,65 @@ Which supporting tools and units are present (read-only).
 
 `{ "enabled": false, "state": "not_configured", "milestone": 6 }`
 
+### Upload to Vault (signed in; admin, or family into a folder they can write)
+
+#### `POST /api/upload-session`
+
+Body (all optional): `{ "folder": "Phone Uploads", "minutes": 10, "client": "dashboard" }`. `folder` is a Vault folder name, never a path; it defaults to `preferences.upload_folder`. `minutes` defaults to `preferences.upload_expiry_minutes` and is capped at 60. Starts the phone listener if it isn't running.
+
+```json
+{ "id": "h8Jh0-pT0yE_G4P-", "kind": "upload", "folder": "Phone Uploads", "created_by": "chris",
+  "client": "dashboard", "created_at": "…", "expires_at": "…", "revoked": false,
+  "max_files": 1000, "max_bytes": 107374182400, "files": 0, "bytes": 0,
+  "state": "active", "url": "http://192.168.1.20:8790/u/<token>", "qr_svg": "<svg…>", "received": [] }
+```
+
+Errors: `400 bad_folder`, `403 not_allowed`, `409 storage_not_ready`, `503 no_network` (no private LAN address, or port 8790 in use).
+
+The token is only inside `url`. Vault keeps the URL in memory so the QR can be shown again while it runs; after a restart the link still works from a phone, but its QR can't be shown again.
+
+#### `GET /api/upload-sessions`
+
+`{ "links": [ …active links, as above… ], "listening": true }`. Admins see every link, others their own.
+
+#### `GET /api/upload-session/{id}` · `DELETE /api/upload-session/{id}`
+
+One link with its `state` (`active`, `expired`, `stopped`, `full`) and the files `received` so far (`[{ "name", "folder", "size", "at", "actor", "kind" }]`). `DELETE` stops the link immediately.
+
+#### `GET /api/activity`
+
+`{ "items": [ …up to 20 recently received files… ] }`. Admins see all, others their own.
+
+### Phone pages (port 8790, only while a link is active)
+
+| Method | Path | |
+|---|---|---|
+| GET | `/u/{token}` | Mobile upload page (or "This link has ended") |
+| GET | `/u/{token}/info` | `{ folder, expires_at (Unix ms), files_left }` |
+| POST | `/u/{token}/files` | `multipart/form-data`, one or more `file` parts; returns `{ "saved": [{name, size}], "folder" }` |
+| GET | `/t/…` | Page assets |
+
+### Power
+
+`POST /api/power/off` (admin): stops Vault (the dashboard's "Turn off Vault" button). `vaultctl off` does the same through systemd.
+
 ## Planned (respond `501` today)
 
 Each returns `{ "error": "not_implemented", "message": "…", "milestone": N }`.
 
 | Method | Path | Milestone |
 |---|---|---|
-| POST | `/api/upload-session` | 4 |
 | POST | `/api/download-session` | 5 |
 | POST | `/api/share` | 5 |
 | DELETE | `/api/share/{id}` | 5 |
 | POST | `/api/remote` | 6 |
 
-### Beam integration (reserved)
+### Beam integration
+
+`POST /api/v1/beam/upload-session` is live (Milestone 4): same body and response as `POST /api/upload-session`, authenticated with the local owner token in `X-Vault-Token`. The others are reserved:
 
 | Method | Path | Milestone |
 |---|---|---|
-| POST | `/api/v1/beam/upload-session` | 4 |
 | POST | `/api/v1/beam/download-session` | 5 |
 | POST | `/api/v1/beam/share` | 5 |
 

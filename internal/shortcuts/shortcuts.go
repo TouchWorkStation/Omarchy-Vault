@@ -1,10 +1,10 @@
 // Package shortcuts plans Vault's Hyprland keybindings and detects
 // conflicts with bindings the user already has.
 //
-// This package never writes Hyprland configuration. Milestone 1 only
-// inspects: installing a binding is a later, explicit, user-approved step,
-// and an existing binding (Omarchy default, Beam, or the user's own) is never
-// overwritten. See docs/shortcuts.md.
+// Installing (install.go) is an explicit, user-approved step that writes
+// only Vault's own file plus one source line; an existing binding (Omarchy
+// default, Beam, or the user's own) is never overwritten. See
+// docs/shortcuts.md.
 package shortcuts
 
 import (
@@ -26,6 +26,9 @@ type Planned struct {
 	Key         string   `json:"key"`
 	Command     string   `json:"command"`
 	Description string   `json:"description"`
+	// Since is the milestone whose command makes this shortcut useful;
+	// shortcuts are only installed once their command exists.
+	Since int `json:"since"`
 }
 
 // Combo renders the binding for humans, e.g. "Super + Shift + U".
@@ -39,9 +42,9 @@ func (p Planned) Line() string {
 // Plan is the default set of Vault shortcuts.
 func Plan() []Planned {
 	return []Planned{
-		{ID: "open", Label: "Open Vault", Direction: "", Mods: []string{"SUPER", "SHIFT"}, Key: "V", Command: "vaultctl open", Description: "Open Vault"},
-		{ID: "upload", Label: "Upload to Vault", Direction: "Phone → Vault", Mods: []string{"SUPER", "SHIFT"}, Key: "U", Command: "vaultctl upload", Description: "Upload to Vault"},
-		{ID: "download", Label: "Download from Vault", Direction: "Vault → Phone", Mods: []string{"SUPER", "SHIFT"}, Key: "D", Command: "vaultctl download", Description: "Download from Vault"},
+		{ID: "open", Label: "Open Vault", Direction: "", Mods: []string{"SUPER", "SHIFT"}, Key: "V", Command: "vaultctl open", Description: "Open Vault", Since: 1},
+		{ID: "upload", Label: "Upload to Vault", Direction: "Phone → Vault", Mods: []string{"SUPER", "SHIFT"}, Key: "U", Command: "vaultctl upload", Description: "Upload to Vault", Since: 4},
+		{ID: "download", Label: "Download from Vault", Direction: "Vault → Phone", Mods: []string{"SUPER", "SHIFT"}, Key: "D", Command: "vaultctl download", Description: "Download from Vault", Since: 5},
 	}
 }
 

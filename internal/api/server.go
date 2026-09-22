@@ -27,6 +27,7 @@ import (
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/shortcuts"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/sysexec"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/transfer"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/users"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/version"
 )
@@ -49,7 +50,11 @@ type Server struct {
 	Users   *users.Store
 	Limiter *auth.LoginLimiter
 	// Files supervises SFTPGo. Nil when not configured.
-	Files     *files.Manager
+	Files *files.Manager
+	// Transfers stores phone transfer links; Transfer serves them on the
+	// local network while any is active.
+	Transfers *transfer.Store
+	Transfer  *transfer.Server
 	Disks     *disks.Scanner
 	Run       sysexec.Runner
 	Shortcuts shortcuts.Inspector
@@ -63,8 +68,9 @@ type Server struct {
 	Log     *slog.Logger
 	Started time.Time
 
-	mu  sync.RWMutex
-	cur config.Config
+	mu    sync.RWMutex
+	cur   config.Config
+	links liveLinks
 	// writeMu serialises storage changes.
 	writeMu sync.Mutex
 }
@@ -132,6 +138,13 @@ func (s *Server) Handler() http.Handler {
 	route("POST", "account/totp/setup", s.gate(user, s.handleTOTPSetup))
 	route("POST", "account/totp/enable", s.gate(user, s.handleTOTPEnable))
 	route("POST", "account/totp/disable", s.gate(user, s.handleTOTPDisable))
+	route("POST", "upload-session", s.gate(user, s.handleCreateUpload))
+	route("GET", "upload-sessions", s.gate(user, s.handleListUploads))
+	route("GET", "upload-session/{id}", s.gate(user, s.handleGetUpload))
+	route("DELETE", "upload-session/{id}", s.gate(user, s.handleStopUpload))
+	route("GET", "activity", s.gate(user, s.handleActivity))
+	// Beam (and other local tools) use the local token.
+	mux.HandleFunc("POST /api/v1/beam/upload-session", s.gate(admin, s.handleCreateUpload))
 
 	// Admins only.
 	route("GET", "disks", s.gate(admin, s.handleDisks))
@@ -209,12 +222,10 @@ type plannedEndpoint struct {
 // planned lists API endpoints that exist in the design but are delivered by
 // later milestones.
 var planned = []plannedEndpoint{
-	{"POST", "upload-session", "Upload to Vault", 4},
 	{"POST", "download-session", "Download from Vault", 5},
 	{"POST", "share", "Share links", 5},
 	{"DELETE", "share/{id}", "Share links", 5},
 	{"POST", "remote", "Remote access", 6},
-	{"POST", "v1/beam/upload-session", "Beam upload sessions", 4},
 	{"POST", "v1/beam/download-session", "Beam download sessions", 5},
 	{"POST", "v1/beam/share", "Beam shares", 5},
 }

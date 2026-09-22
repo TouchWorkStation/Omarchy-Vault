@@ -25,9 +25,9 @@ Vault uses the Vault's point of view:
    - Skip Shortcut
    ```
 
-5. **Install (Milestone 4, never automatic).** After the user confirms, Vault writes only its own file, `~/.config/hypr/omarchy-vault.conf`, and adds one `source = ~/.config/hypr/omarchy-vault.conf` line to the user's `hyprland.conf` after showing it. It never edits Omarchy's or Beam's binding files and never removes a binding. Uninstalling removes the Vault file and that one line.
+5. **Install (never automatic).** After the user confirms, Vault writes only its own file, `~/.config/hypr/omarchy-vault.conf`, and adds one `source = ~/.config/hypr/omarchy-vault.conf` line to the user's `hyprland.conf` after showing it. It never edits Omarchy's or Beam's binding files and never removes a binding. Uninstalling removes the Vault file and that one line.
 
-## Check today
+## Check
 
 ```sh
 vaultctl shortcuts          # human-readable
@@ -35,3 +35,40 @@ vaultctl shortcuts --json
 ```
 
 or `GET /api/shortcuts`, or Settings → Shortcuts in the dashboard.
+
+## Install
+
+```sh
+vaultctl shortcuts install                    # shows what it will write, asks before writing
+vaultctl shortcuts install --use-suggestions  # a taken shortcut gets its free alternative instead
+vaultctl shortcuts install --yes              # no question (for scripts)
+```
+
+It installs only shortcuts whose command exists already (Download arrives in Milestone 5; run install again then) and only those that are free. A taken one is skipped, never overwritten, unless you pass `--use-suggestions`, which uses the checked-free alternative (e.g. Super + Alt + U). Hyprland reloads its config by itself, so they work at once.
+
+What it writes:
+
+- `~/.config/hypr/omarchy-vault.conf` (Vault's own file, marked with a header). If a file by that name exists without Vault's header, Vault refuses to touch it.
+- one line at the end of `~/.config/hypr/hyprland.conf`, under a comment:
+
+  ```
+  # Omarchy Vault shortcuts (remove with: vaultctl shortcuts remove)
+  source = ~/.config/hypr/omarchy-vault.conf
+  ```
+
+## Remove
+
+```sh
+vaultctl shortcuts remove
+```
+
+Deletes Vault's file and exactly those two lines; the rest of `hyprland.conf` stays byte for byte as it was. `scripts/uninstall.sh` does this for you.
+
+## Prefer to do it by hand?
+
+Add to `~/.config/hypr/bindings.conf`:
+
+```
+bindd = SUPER SHIFT, V, Open Vault, exec, vaultctl open
+bindd = SUPER SHIFT, U, Upload to Vault, exec, vaultctl upload
+```

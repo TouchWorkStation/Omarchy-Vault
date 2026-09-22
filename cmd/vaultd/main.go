@@ -26,6 +26,7 @@ import (
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/shortcuts"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/sysexec"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/transfer"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/users"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/version"
 	"github.com/TouchWorkStation/Omarchy-Vault/web"
@@ -146,6 +147,14 @@ func run() error {
 	}
 	fileMgr := files.NewManager(fp, log)
 
+	// Phone transfers: links live in SQLite (hashes only); the LAN
+	// listener exists only while a link is active.
+	transfers, err := transfer.Open(filepath.Join(filepath.Dir(cfgPathLive), "vault.db"))
+	if err != nil {
+		return err
+	}
+	defer transfers.Close()
+
 	static, built := web.Dist()
 	if !built {
 		log.Warn("web UI not built into this binary; run `make web && make build`")
@@ -162,6 +171,7 @@ func run() error {
 		Auth:        auth.NewLocal(token),
 		Users:       userStore,
 		Files:       fileMgr,
+		Transfers:   transfers,
 		Disks:       &disks.Scanner{Run: run, SMART: !*noSMART},
 		Run:         run,
 		Shortcuts: shortcuts.Inspector{
@@ -191,6 +201,13 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	srv.PowerOff = stop
+	srv.Transfer = &transfer.Server{Store: transfers, Dest: srv.TransferDest, Log: log,
+		Host: cfg.Transfer.Host, Port: cfg.Transfer.Port}
+	if *demoMode {
+		// Demo links are for trying the phone page in a desktop browser.
+		srv.Transfer.Host = "127.0.0.1"
+	}
+	go srv.Transfer.Run(ctx)
 
 	// Background workers: the file service and the storage monitor that
 	// starts/stops it as the drive comes and goes.

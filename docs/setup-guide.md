@@ -1,6 +1,6 @@
 # Omarchy Vault setup guide
 
-This guide takes you from a spare drive to a working Vault with your own account, family accounts and a file browser. Follow the parts in order the first time.
+This guide takes you from a spare drive to a working Vault with your own account, family accounts, a file browser, and phone uploads by QR code. Follow the parts in order the first time.
 
 1. [What you need](#1-what-you-need)
 2. [Prepare your drive](#2-prepare-your-drive)
@@ -8,9 +8,11 @@ This guide takes you from a spare drive to a working Vault with your own account
 4. [First-run setup](#4-first-run-setup)
 5. [Files](#5-files)
 6. [Users](#6-users)
-7. [Everyday use](#7-everyday-use)
-8. [Troubleshooting](#8-troubleshooting)
-9. [Uninstall](#9-uninstall)
+7. [Keyboard shortcuts](#7-keyboard-shortcuts)
+8. [Upload from your phone](#8-upload-from-your-phone)
+9. [Everyday use](#9-everyday-use)
+10. [Troubleshooting](#10-troubleshooting)
+11. [Uninstall](#11-uninstall)
 
 > **Vault never formats, partitions, erases or mounts drives.** It only uses a drive that is already mounted. Section 2 shows the few one-time commands *you* run to get a drive ready. Read each one before you run it.
 
@@ -177,7 +179,7 @@ Drives Vault can use:
   sda1       WDC WD80EFZZ-68BTXN0       /mnt/vault-disk1             5.3 TB free of 7.9 TB
 ```
 
-If your drive is missing or not usable, see [Troubleshooting](#8-troubleshooting).
+If your drive is missing or not usable, see [Troubleshooting](#10-troubleshooting).
 
 ---
 
@@ -201,7 +203,7 @@ The installer explains each step and asks before anything optional:
 | `/srv/vault` | Creates the shortcut `/srv/vault` → your Vault (asks) | yes, once |
 | Programs | Installs `vaultd` and `vaultctl` to `~/.local/bin` | no |
 | Service | Installs the `omarchy-vault` user service. It **never starts by itself**; the installer asks whether to turn it on now | no |
-| Shortcuts | Checks Super+Shift+V/U/D for conflicts. Changes nothing | no |
+| Shortcuts | Checks Super+Shift+V/U/D for conflicts. Changes nothing (install them in section 7) | no |
 
 If `vaultctl` is "not found", add `~/.local/bin` to your PATH:
 
@@ -331,10 +333,67 @@ Open **Account** (click your name in the sidebar):
 
 ---
 
-## 7. Everyday use
+## 7. Keyboard shortcuts
+
+Vault can add these, but only when you ask and only if they are free:
+
+| Shortcut | Does |
+|---|---|
+| Super + Shift + V | Open Vault |
+| Super + Shift + U | Upload to Vault (phone → Vault) |
+| Super + Shift + D | Download from Vault (Milestone 5) |
+
+```sh
+vaultctl shortcuts             # check: which are free, which are taken and by what
+vaultctl shortcuts install     # shows exactly what it will write, then asks
+```
+
+A shortcut that's already used (by Omarchy, Beam or you) is **skipped, never replaced**. To use Vault's suggested free alternative instead (e.g. Super + Alt + U), run `vaultctl shortcuts install --use-suggestions`. To undo everything: `vaultctl shortcuts remove`. Details: [shortcuts.md](shortcuts.md).
+
+---
+
+## 8. Upload from your phone
+
+Send photos, videos and files from your phone into the Vault, with no app and no account on the phone.
+
+**Before the first time**
+
+1. Your phone must be on the **same Wi-Fi** as this computer (or the same home network, if the computer is on Ethernet).
+2. Omarchy's firewall (ufw) blocks incoming connections by default. Allow Vault's phone port from your home network only, once:
+
+   ```sh
+   sudo ufw status                                   # "inactive"? nothing to do
+   sudo ufw allow from 192.168.1.0/24 to any port 8790 proto tcp
+   ```
+
+   Replace `192.168.1.0/24` with your network: run `ip -4 route | grep -v default` and use the address before `dev` on your Wi-Fi/Ethernet line (e.g. `192.168.0.0/24` or `10.0.0.0/24`). Vault listens on this port **only while an upload code is showing**. To undo: `sudo ufw delete allow from 192.168.1.0/24 to any port 8790 proto tcp`.
+
+**Every time**
+
+1. Press **Super + Shift + U** (or run `vaultctl upload`, or click **Upload** in the dashboard). Vault turns on if it was off and shows a QR code.
+2. Point your phone's camera at the code and tap the link.
+3. Choose **Select Photos**, **Take Photo**, **Select Videos** or **Choose Files**. You see progress for each file, then a list of what arrived.
+4. The files appear on the computer's screen as they arrive, and in **Vault → Phone Uploads** (`/srv/vault/Phone Uploads`).
+5. Click **Stop** when you're done, or just leave it: the code stops working after 10 minutes.
+
+In a terminal only? `vaultctl upload --terminal` prints the QR code in the terminal and stops the code when you press Ctrl+C. Other options: `--folder Photos` to send into another Vault folder, `--minutes 30` for a longer code (up to 60).
+
+**Good to know**
+
+- Nothing is ever overwritten: a second `IMG_0001.jpg` becomes `IMG_0001 (1).jpg`.
+- Vault stops accepting files before your drive is completely full (it keeps 1 GB free).
+- Family members can create codes for folders they can write; guests can't.
+- Each code works for one folder, can't be used to see or download anything, and ends when it expires, when you click Stop, or after 1000 files.
+- Use it on your own Wi-Fi, not on public Wi-Fi: on the local network the upload is not encrypted (it is once remote access arrives in Milestone 6).
+- Phone not connecting? See Troubleshooting.
+
+---
+
+## 9. Everyday use
 
 - **Turn on / off:** `vaultctl on` / `vaultctl off`. Vault never runs unless you turn it on.
-- **Open Vault:** `vaultctl open` (turns it on if needed), or add the shortcut (see the README "Shortcuts" section): `bindd = SUPER SHIFT, V, Open Vault, exec, vaultctl open` in `~/.config/hypr/bindings.conf`.
+- **Open Vault:** `vaultctl open` (turns it on if needed), or Super + Shift + V once you've installed the shortcuts (section 7).
+- **Phone → Vault:** Super + Shift + U or `vaultctl upload` (section 8).
 - **Status at a glance:** `vaultctl status`, or the Home page.
 - **Drive unplugged or not mounted (while Vault is on):** Vault shows your storage as *Offline*, pauses Files, and never writes anything to your system drive in the meantime. Plug the drive back in (or `sudo mount -a`) and everything resumes within about 20 seconds.
 - **Drive mounted somewhere else:** Vault shows *Drive moved*. Choose it again in Storage → *Use it at its new location*.
@@ -344,7 +403,7 @@ Open **Account** (click your name in the sidebar):
 
 ---
 
-## 8. Troubleshooting
+## 10. Troubleshooting
 
 Start with:
 
@@ -368,11 +427,15 @@ vaultctl logs -f        # live log of the Vault service
 | Locked out after wrong passwords | Wait 1–15 minutes, or reset the password from the terminal |
 | "That sign-in link expired" | Open Vault again with `vaultctl open` (links from it work once, for 30 seconds) |
 | "Vault is off" | That's the default. Turn it on with `vaultctl on` or open it with `vaultctl open` |
+| Phone says "can't connect" / page never loads | Phone on the same Wi-Fi (not mobile data, not a guest network)? Firewall rule from section 8 added? Some routers isolate Wi-Fi devices ("AP/client isolation"); turn that off for your home network |
+| "Your phone can't reach this computer: not connected to a local network" | The computer has no private network address (e.g. only a VPN). Connect to your home Wi-Fi/Ethernet, or set `"transfer": {"host": "<your LAN IP>"}` in `~/.config/omarchy-vault/config.json` |
+| "port 8790 is in use by another program" | Set another port: `"transfer": {"port": 8791}` in config.json (and allow it in ufw) |
+| "LINK ENDED" on the phone | The code expired or was stopped. Press Super + Shift + U for a new one |
 | Could not identify the system drive | Vault then refuses every drive, to be safe. Run `vaultctl disks` and `findmnt /`, and report it as an issue |
 
 ---
 
-## 9. Uninstall
+## 11. Uninstall
 
 ```sh
 cd ~/Omarchy-Vault
@@ -380,4 +443,4 @@ cd ~/Omarchy-Vault
 ./scripts/uninstall.sh
 ```
 
-This removes the programs, the service, the file service program and the `/srv/vault` shortcut. It keeps your settings, your users and **every file on your drive**. To also remove settings: `rm -rf ~/.config/omarchy-vault ~/.local/share/omarchy-vault`. Your fstab line and drive are untouched; remove the fstab line yourself if you no longer want the drive mounted.
+This removes Vault's keyboard shortcuts, the programs, the service, the file service program and the `/srv/vault` shortcut. It keeps your settings, your users and **every file on your drive**. To also remove settings: `rm -rf ~/.config/omarchy-vault ~/.local/share/omarchy-vault`. Your fstab line and drive are untouched; remove the fstab line yourself if you no longer want the drive mounted.

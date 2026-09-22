@@ -22,16 +22,18 @@ It is **not** a replacement for TrueNAS, Unraid or ZimaOS. There is no separate 
 
 ## Status
 
-**Milestones 1–3 of 7 are complete.** Vault protects your system disk, turns a mounted drive into your Vault, and gives everyone in the house their own account and a file browser. See [ROADMAP.md](ROADMAP.md).
+**Milestones 1–4 of 7 are complete.** Vault protects your system disk, turns a mounted drive into your Vault, gives everyone in the house their own account and a file browser, and takes photos and videos straight from your phone with a QR code. See [ROADMAP.md](ROADMAP.md).
 
 | Works now | Coming |
 |---|---|
-| First-run setup: choose a drive, create your admin account | **Upload to Vault**: Super+Shift+U, QR code (M4) |
-| **Files** in the browser: browse, upload, download, folders (M3) | **Download from Vault**: Super+Shift+D, QR code (M5) |
-| **Users**: Admin / Family / Guest, per-folder read & write or read only (M3) | Share links (M5) |
+| **Upload to Vault**: Super+Shift+U, scan the QR code, send photos/videos/files from your phone (M4) | **Download from Vault**: Super+Shift+D, QR code (M5) |
+| First-run setup: choose a drive, create your admin account | Share links (M5) |
+| **Files** in the browser: browse, upload, download, folders (M3) | |
+| **Users**: Admin / Family / Guest, per-folder read & write or read only (M3) | |
 | Sign-in with lockout, optional two-factor (TOTP) (M3) | Remote access through Cloudflare Tunnel (M6) |
 | Your Vault at `/srv/vault`; unplugged drives never fill the system disk (M2) | Combining several drives, LAN sharing (M7) |
 | Drive discovery, SYSTEM · PROTECTED detection, SMART health (M1) | Backups (M8) |
+| Keyboard shortcuts installed only with your OK, never over an existing one (M4) | |
 
 **New here? Follow the [setup guide](docs/setup-guide.md)**: preparing a drive, installing, first-run, Files and users, step by step.
 
@@ -107,9 +109,13 @@ Full threat model: [SECURITY.md](SECURITY.md).
 
 ## Beam and Vault
 
-Beam and Vault are separate projects. Vault does not depend on Beam and does not modify it. Vault reserves `POST /api/v1/beam/*` endpoints so Beam can later ask Vault for upload sessions, download sessions and shares ([docs/api.md](docs/api.md)).
+Beam and Vault are separate projects. Vault does not depend on Beam and does not modify it. Beam can ask Vault for an upload session today (`POST /api/v1/beam/upload-session`); download sessions and shares are reserved for Milestone 5 ([docs/api.md](docs/api.md)).
 
 ## Screenshots
+
+| Upload to Vault: scan and watch files arrive | On the phone |
+|---|---|
+| ![Upload QR code](docs/screenshots/upload-qr.png) | ![Phone upload page](docs/screenshots/upload-phone.png) |
 
 | Setup: choose a drive | Setup: create your Vault |
 |---|---|
@@ -130,7 +136,7 @@ Screenshots use `--demo` data.
 1. ✅ Foundation: dashboard, read-only drive discovery, shortcut planning
 2. ✅ Single-drive Vault, config, `/srv/vault`, system disk protection
 3. ✅ SFTPGo files and users
-4. Upload to Vault (Super+Shift+U), QR, mobile upload page
+4. ✅ Upload to Vault (Super+Shift+U), QR, mobile upload page
 5. Download from Vault (Super+Shift+D), file picker, mobile download page
 6. Remote access through Cloudflare Tunnel
 7. Combining drives with mergerfs, SMART monitoring, optional LAN sharing

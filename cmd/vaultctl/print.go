@@ -137,5 +137,5 @@ func printShortcuts(w io.Writer, rep shortcuts.Report) {
 	for _, warn := range rep.Warnings {
 		fmt.Fprintf(w, "! %s\n", warn)
 	}
-	fmt.Fprintln(w, "Vault has not changed any keybindings. Existing shortcuts are never overwritten.")
+	fmt.Fprintln(w, "Install the free ones with: vaultctl shortcuts install   (existing shortcuts are never overwritten)")
 }

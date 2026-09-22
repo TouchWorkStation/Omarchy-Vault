@@ -19,7 +19,7 @@ func TestHumanBytes(t *testing.T) {
 }
 
 func TestNotYetCommandsChangeNothing(t *testing.T) {
-	for _, args := range [][]string{{"upload"}, {"download"}, {"share", "x"}} {
+	for _, args := range [][]string{{"download"}, {"share", "x"}} {
 		if code := realMain(args); code != 3 {
 			t.Errorf("%v exit = %d, want 3", args, code)
 		}

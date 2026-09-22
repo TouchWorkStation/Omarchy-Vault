@@ -40,14 +40,18 @@ Vault is built in milestones. Each ends in a working, tested, committed state. N
 - First-run Account screen creates your admin; everything is behind sign-in afterwards
 - Complete [setup guide](docs/setup-guide.md)
 
-## Milestone 4: Upload to Vault
+## ✅ Milestone 4: Upload to Vault
 
-- SQLite (tokens, activity)
-- `POST /api/upload-session`, hashed tokens, 10-minute expiry, revocation
-- QR code generation (in-process, no network)
-- Mobile upload page: Select Photos, Take Photo, Select Videos, Choose Files; progress; result list
-- `vaultctl upload` and Super+Shift+U, installed only if free, with user confirmation
-- Local API client keys (for Beam)
+- SQLite (`vault.db`: upload links as SHA-256 hashes, received-file activity)
+- `POST /api/upload-session`, 256-bit tokens, 10-minute default expiry (1–60), Stop at any time; 1000 files / 100 GB per link
+- QR code generation (in-process, no network): on screen as SVG, in the terminal as text
+- Phone listener on port 8790 that exists **only while a link is active**, serving only the upload page
+- Mobile upload page: Select Photos, Take Photo, Select Videos, Choose Files; per-file progress; result list; Upload more
+- Files stream straight to the drive, never overwrite (`photo (1).jpg`), keep 1 GB free
+- Dashboard: Upload page, live QR page with countdown and received list, Recent files on Home
+- `vaultctl upload [--folder] [--minutes] [--terminal]`; Super+Shift+U
+- `vaultctl shortcuts install / remove`: installs only free shortcuts, after showing exactly what it writes
+- Beam: `POST /api/v1/beam/upload-session` (local owner token). Per-client API keys moved to Milestone 5
 
 ## Milestone 5: Download from Vault
 

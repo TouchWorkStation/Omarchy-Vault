@@ -123,13 +123,25 @@ Forbidden, permanently: `exec(command)`, `run_shell(command)`, arbitrary paths, 
 
 ## Token model (Milestones 4–5)
 
+Implemented for uploads in Milestone 4; download and share tokens follow the same rules in Milestone 5.
+
 - 32 bytes from `crypto/rand`, base64url in the URL. Only the SHA-256 hash is stored (SQLite). Lookup compares hashes in constant time.
 - Every token has one scope: upload into one folder, or download one file/folder, or view one share.
-- Upload tokens: upload-only, cannot list or read; default 10-minute expiry; size and count limits; revocable.
+- Upload tokens: upload-only, cannot list or read; default 10-minute expiry (at most 60); 1000 files and 100 GB per link; revocable with Stop. Only admins, and family members into folders they can write, can create one; guests cannot.
+- Wrong tokens count towards the same lockout as passwords (per phone IP, 1 → 15 minutes).
 - Download tokens: one resource; default 10 minutes and 1 download; configurable.
 - Share links: read-only always; expiry 10 min / 1 h / 24 h / custom; one / limited / unlimited downloads until expiry; optional password (argon2id); manual revoke.
 - URLs never contain filesystem paths. Filenames from phones are sanitised (no separators, no leading dots, no control characters, length-limited) and never overwrite existing files.
 - Token path segments (`/u/…`, `/d/…`, `/s/…`) are redacted in logs.
+
+### The phone listener (Milestone 4)
+
+Phones can't reach the dashboard (it listens on 127.0.0.1 only). While at least one upload link is active, Vault opens a **second, separate** listener on your LAN address, port 8790. It serves only the upload page for a valid token (`/u/<token>`), its status, the upload itself, and static page assets. No dashboard, no API, no Files, no directory listing. It closes as soon as the last link expires or is stopped (checked every 30 seconds; an upload still arriving finishes first), and it never runs while Vault is off.
+
+- It binds to one address, never `0.0.0.0`: the private LAN address it detects, or the IP you set as `transfer.host` in config (loopback and `0.0.0.0` are refused). If no private network address is found, no link is created.
+- **Plain HTTP.** On your own Wi-Fi this is like any home device; someone on the same network who can capture traffic could see the token and the files. Don't use upload links on untrusted Wi-Fi (cafés, hotels). HTTPS arrives with remote access (Milestone 6).
+- Strict CSP (`default-src 'none'`, own scripts and styles only), `Referrer-Policy: no-referrer` (the token is in the URL), `no-store`, framing denied.
+- Files are streamed to a hidden `.vault-partial-*` file inside the destination folder and renamed into place with `RENAME_NOREPLACE`, so an existing file is never replaced; the folder is opened through `os.Root`, so a symlink can't redirect the write. Partial files are deleted on error.
 
 ## Web security
 

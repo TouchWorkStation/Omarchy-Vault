@@ -180,7 +180,8 @@ for f in "$REPO"/plugin/qml/*.qml; do
   run install -m 0644 "$f" "$DATA_DIR/plugin/qml/$(basename "$f")"
 done
 
-# 10. Shortcuts: check only. Never written in Milestone 1.
+# 10. Shortcuts: check only. Installing them is a separate, explicit step
+# (vaultctl shortcuts install) that never overwrites an existing binding.
 say "Checking shortcuts (nothing is changed)"
 if [[ $DRY_RUN -eq 0 ]]; then
   "$BIN_DIR/vaultctl" shortcuts || true
@@ -194,6 +195,8 @@ cat <<MSG
     Turn on / off:     vaultctl on   |   vaultctl off
     Set up storage:    vaultctl setup          (turns Vault on, opens the setup screens)
     Open Vault:        vaultctl open           (turns Vault on, http://127.0.0.1:8788)
+    Phone → Vault:     vaultctl upload         (QR code; phone on the same Wi-Fi)
+    Add shortcuts:     vaultctl shortcuts install   (Super+Shift+V, Super+Shift+U)
 
     Vault never runs by itself: nothing starts at login or boot.
     Check everything:  vaultctl doctor

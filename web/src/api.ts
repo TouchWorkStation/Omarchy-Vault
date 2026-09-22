@@ -317,3 +317,29 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
   }
   return res.json() as Promise<T>;
 }
+
+export interface TransferItem {
+  at: string;
+  kind: string;
+  folder: string;
+  name: string;
+  size: number;
+  actor: string;
+}
+
+export interface LinkView {
+  id: string;
+  kind: string;
+  folder: string;
+  created_by: string;
+  client: string;
+  created_at: string;
+  expires_at: string;
+  revoked: boolean;
+  files: number;
+  bytes: number;
+  state: "active" | "expired" | "stopped" | "full";
+  url?: string;
+  qr_svg?: string;
+  received: TransferItem[];
+}

@@ -54,10 +54,15 @@ Commands:
   users remove <name> [--yes]  Delete the account (never their files)
   files           File service status and address
   remote status   Remote access status
-  upload          Upload to Vault: Phone -> Vault       (Milestone 4)
+  upload [--folder NAME] [--minutes N] [--terminal]
+                  Upload to Vault (Phone -> Vault): shows a QR code for your phone
   download        Download from Vault: Vault -> Phone   (Milestone 5)
   share <file>    Create a share link                   (Milestone 5)
-  shortcuts       Check Vault shortcuts for conflicts (never installs)
+  shortcuts       Check Vault's shortcuts for conflicts
+  shortcuts install [--use-suggestions] [--yes]
+                  Add the free ones (never replaces an existing binding)
+  shortcuts remove [--yes]
+                  Remove Vault's shortcuts
   open            Open the Vault dashboard (turns Vault on if needed)
   doctor          Check that everything Vault needs is in place
   logs [-f]       Show Vault service logs
@@ -141,7 +146,7 @@ func realMain(args []string) int {
 	case "files":
 		err = a.filesCmd(ctx)
 	case "upload":
-		return notYet("Upload to Vault (Phone -> Vault)", 4)
+		err = a.upload(ctx, cmdArgs)
 	case "download":
 		return notYet("Download from Vault (Vault -> Phone)", 5)
 	case "share":
@@ -150,7 +155,7 @@ func realMain(args []string) int {
 		}
 		return notYet("Share links", 5)
 	case "shortcuts":
-		err = a.shortcuts(ctx)
+		err = a.shortcutsCmd(ctx, cmdArgs)
 	case "open":
 		if err = a.ensureOn(ctx); err == nil {
 			err = a.openPage(ctx, "/")
@@ -321,13 +326,65 @@ func (a *app) remoteStatus() error {
 	return nil
 }
 
-func (a *app) shortcuts(ctx context.Context) error {
-	rep := a.shortcutInspector().Analyze(ctx)
-	if a.json {
-		return a.emitJSON(rep)
+func (a *app) shortcutsCmd(ctx context.Context, args []string) error {
+	insp := a.shortcutInspector()
+	yes, suggest := false, false
+	for _, x := range args[min(1, len(args)):] {
+		switch x {
+		case "--yes", "-y":
+			yes = true
+		case "--use-suggestions":
+			suggest = true
+		default:
+			return fmt.Errorf("unexpected argument %q", x)
+		}
 	}
-	printShortcuts(a.out, rep)
-	return nil
+	if len(args) == 0 {
+		rep := insp.Analyze(ctx)
+		if a.json {
+			return a.emitJSON(rep)
+		}
+		printShortcuts(a.out, rep)
+		return nil
+	}
+	switch args[0] {
+	case "install":
+		bs, skipped, err := shortcuts.Choose(insp.Analyze(ctx), version.Milestone, suggest)
+		if err != nil {
+			return err
+		}
+		for _, s := range skipped {
+			fmt.Fprintf(a.out, "  skip  %s\n", s)
+		}
+		if len(bs) == 0 {
+			fmt.Fprintln(a.out, "Nothing to install. Try --use-suggestions to use a free alternative.")
+			return nil
+		}
+		fmt.Fprintf(a.out, "Vault will write %s:\n\n%s\n", shortcuts.IncludePath(insp.Home), shortcuts.Render(bs))
+		fmt.Fprintf(a.out, "and, if it is not there yet, add this line to %s:\n\n    %s\n\n", insp.ConfigPath, shortcuts.SourceLine())
+		if !yes && !confirm("Install these shortcuts?") {
+			return errors.New("cancelled; nothing was changed")
+		}
+		if _, err := shortcuts.Install(insp.Home, insp.ConfigPath, bs); err != nil {
+			return err
+		}
+		fmt.Fprintln(a.out, "Done. Hyprland picks them up right away:")
+		for _, b := range bs {
+			fmt.Fprintf(a.out, "  %-22s %s\n", b.Combo(), b.Label)
+		}
+		return nil
+	case "remove":
+		if !yes && !confirm("Remove Vault's shortcuts?") {
+			return errors.New("cancelled; nothing was changed")
+		}
+		if err := shortcuts.Remove(insp.Home, insp.ConfigPath); err != nil {
+			return err
+		}
+		fmt.Fprintln(a.out, "Vault's shortcuts were removed. Your other bindings were not touched.")
+		return nil
+	default:
+		return fmt.Errorf("unknown shortcuts command %q (install, remove)", args[0])
+	}
 }
 
 func logs(args []string) error {

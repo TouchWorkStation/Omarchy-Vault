@@ -1,4 +1,4 @@
-import type { Session, ShortcutBrief, Status } from "../api";
+import type { Session, ShortcutBrief, Status, TransferItem } from "../api";
 import { Link } from "../App";
 import { icons } from "../components/Icons";
 import { Badge, Card, Kbd, Loading, Meter, Notice, Stat } from "../components/ui";
@@ -30,10 +30,27 @@ function shortcutBadge(s: ShortcutBrief["status"]) {
 }
 
 const actions = [
-  { to: "/upload", icon: icons.upload, label: "Upload", sub: "Phone → Vault", m: 4 },
+  { to: "/upload", icon: icons.upload, label: "Upload", sub: "Phone → Vault", m: 0 },
   { to: "/download", icon: icons.download, label: "Download", sub: "Vault → Phone", m: 5 },
   { to: "/files", icon: icons.files, label: "Open Files", sub: "Browse your Vault", m: 0 },
 ];
+
+function RecentFiles() {
+  const { data } = useApi<{ items: TransferItem[] }>("/api/activity", 30_000);
+  if (!data || data.items.length === 0) return <p className="muted">Files you send from your phone show up here.</p>;
+  return (
+    <ul className="received">
+      {data.items.slice(0, 6).map((f, i) => (
+        <li key={i}>
+          <span className="received-name">{f.name}</span>
+          <span className="muted small">
+            {f.folder} · {bytes(f.size)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function Home() {
   const { data: s, error } = useApi<Status>("/api/status", 60_000);
@@ -144,6 +161,10 @@ export function Home() {
             ))}
           </ul>
           <p className="muted small">Vault never overwrites an existing shortcut.</p>
+        </Card>
+
+        <Card title="RECENT FILES">
+          <RecentFiles />
         </Card>
 
         <Card title="FILES">

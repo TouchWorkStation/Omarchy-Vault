@@ -9,6 +9,8 @@ import { SignIn } from "./pages/SignIn";
 import { Files } from "./pages/Files";
 import { Users } from "./pages/Users";
 import { Account } from "./pages/Account";
+import { Upload } from "./pages/Upload";
+import { Transfer } from "./pages/Transfer";
 import { send, setSignedOutHandler, type Session } from "./api";
 import { useApi } from "./useApi";
 
@@ -64,6 +66,7 @@ export function Link({ to, className, children }: { to: string; className?: stri
 }
 
 function Page({ path }: { path: string }) {
+  if (path.startsWith("/transfer/")) return <Transfer id={path.slice("/transfer/".length)} />;
   switch (path) {
     case "/":
       return <Home />;
@@ -80,16 +83,7 @@ function Page({ path }: { path: string }) {
     case "/account":
       return <Account />;
     case "/upload":
-      return (
-        <Planned
-          title="UPLOAD TO VAULT"
-          subtitle="Phone → Vault"
-          milestone={4}
-          combo="Super + Shift + U"
-          lead="Press the shortcut, scan the QR code with your phone, pick photos, videos or files. They land in Phone Uploads."
-          points={["No app needed on the phone", "Link expires after 10 minutes", "Upload-only: the phone never sees the rest of your Vault"]}
-        />
-      );
+      return <Upload />;
     case "/download":
       return (
         <Planned

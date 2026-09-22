@@ -1104,3 +1104,57 @@ main.off {
   margin: 15vh auto;
   padding: 0 16px;
 }
+
+/* ---------- Milestone 4: transfers ---------- */
+
+.transfer {
+  max-width: 640px;
+  margin: 0 auto;
+}
+.transfer-head {
+  text-align: center;
+}
+.transfer-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.qr-big {
+  width: min(300px, 80vw);
+  height: auto;
+  padding: 0;
+}
+.transfer-qr .lead {
+  margin: 8px 0 0;
+}
+.countdown {
+  font-size: 18px;
+  margin: 4px 0 0;
+}
+.received {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow: auto;
+}
+.received li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.received li:last-child {
+  border-bottom: none;
+}
+.received-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ok-glyph {
+  color: var(--good);
+}

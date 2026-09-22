@@ -17,6 +17,13 @@ if systemctl --user list-unit-files omarchy-vault.service >/dev/null 2>&1; then
   run systemctl --user disable --now omarchy-vault.service || true
 fi
 
+# Vault's own shortcut file and its one source line (before vaultctl goes).
+HYPR_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
+if [[ -f "$HYPR_DIR/omarchy-vault.conf" && -x "$HOME/.local/bin/vaultctl" ]]; then
+  echo "==> Removing Vault's keyboard shortcuts (your others are untouched)"
+  run "$HOME/.local/bin/vaultctl" shortcuts remove --yes || true
+fi
+
 echo "==> Removing programs and service"
 for f in "$HOME/.local/bin/vaultd" "$HOME/.local/bin/vaultctl" "$UNIT"; do
   [[ -e "$f" ]] && run rm -f "$f"

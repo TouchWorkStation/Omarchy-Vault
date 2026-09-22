@@ -31,3 +31,40 @@ func Encode(text string) (string, error) {
 	b.WriteString(`"/></svg>`)
 	return b.String(), nil
 }
+
+// Terminal renders text as a QR code for a dark terminal using half-block
+// characters (two modules per character row). Light modules are drawn,
+// dark ones left blank, with a quiet zone, so phones read it as normal.
+func Terminal(text string) (string, error) {
+	code, err := qr.Encode(text, qr.L)
+	if err != nil {
+		return "", err
+	}
+	const quiet = 2
+	n := code.Size + 2*quiet
+	light := func(x, y int) bool {
+		x, y = x-quiet, y-quiet
+		if x < 0 || y < 0 || x >= code.Size || y >= code.Size {
+			return true
+		}
+		return !code.Black(x, y)
+	}
+	var b strings.Builder
+	for y := 0; y < n; y += 2 {
+		for x := 0; x < n; x++ {
+			top, bottom := light(x, y), y+1 < n && light(x, y+1)
+			switch {
+			case top && bottom:
+				b.WriteRune('█')
+			case top:
+				b.WriteRune('▀')
+			case bottom:
+				b.WriteRune('▄')
+			default:
+				b.WriteRune(' ')
+			}
+		}
+		b.WriteByte('\n')
+	}
+	return b.String(), nil
+}

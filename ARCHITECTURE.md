@@ -112,11 +112,18 @@ browser ──► vaultd :8788 ──(/files/*, Vault session required)──►
 ## Transfers (Milestones 4–5)
 
 ```
-Super+Shift+U → vaultctl upload → POST /api/upload-session
-   → 32-byte random token, stored as SHA-256 hash, scope = "upload into Phone Uploads", expires 10 min
-   → QR: https://<host>/u/<token>   (no paths in the URL)
-Phone → GET /u/<token> (mobile page) → POST /u/<token>/files (streamed to disk, size-limited)
+Super+Shift+U → vaultctl upload → (turns Vault on) → POST /api/upload-session
+   → 32-byte random token, stored as SHA-256 hash in vault.db, scope = "upload into Phone Uploads", expires 10 min
+   → phone listener starts on <LAN IP>:8790 (only while a link is active)
+   → QR: http://<LAN IP>:8790/u/<token>   (no paths in the URL)
+   → vaultctl opens the Vault window at /transfer/<id> (or prints the QR with --terminal)
+Phone → GET /u/<token> (mobile page) → POST /u/<token>/files
+   → multipart parts streamed one at a time into <folder>/.vault-partial-*, renamed with RENAME_NOREPLACE
+   → each file recorded in vault.db (activity) → dashboard polls /api/upload-session/<id>
+Link expires / Stop → listener closes
 ```
+
+`internal/transfer` holds the store (SQLite through the pure-Go `modernc.org/sqlite`, no cgo), the safe file writer, and the phone listener with its embedded pages (`internal/transfer/web`). The listener is a separate `http.Server` with its own tiny mux, so none of the dashboard's routes exist on it.
 
 Download sessions mirror this with scope = one resource, `max_downloads` (default 1). Folders are streamed as a zip built on the fly, with paths relative to the shared folder. Tokens are redacted from logs.
 
@@ -128,7 +135,7 @@ Beam stays independent. When it wants persistent storage it can call:
 - `POST /api/v1/beam/download-session`
 - `POST /api/v1/beam/share`
 
-These return the same token/QR payloads as Vault's own flows. Authentication for local API clients (a per-client key stored 0600) arrives with Milestone 4.
+These return the same token/QR payloads as Vault's own flows. `beam/upload-session` works today with the local owner token (`~/.config/omarchy-vault/secrets/local-token`, 0600) sent in the `X-Vault-Token` header; per-client keys arrive with Milestone 5.
 
 ## Repository layout
 
