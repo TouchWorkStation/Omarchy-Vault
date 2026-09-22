@@ -1,5 +1,10 @@
 # Omarchy Vault — runs as YOUR user (systemctl --user), never as root.
 # Installed to ~/.config/systemd/user/ by scripts/install.sh.
+#
+# Vault runs only when you turn it on (vaultctl on, or opening Vault) and
+# stops when you turn it off (vaultctl off, or the dashboard). There is
+# deliberately no [Install] section, so it can never start by itself at
+# login or boot.
 [Unit]
 Description=Omarchy Vault (private cloud dashboard and API)
 Documentation=https://github.com/TouchWorkStation/Omarchy-Vault
@@ -28,5 +33,3 @@ MemoryMax=512M
 # Stop the file service together with Vault.
 KillMode=control-group
 
-[Install]
-WantedBy=default.target

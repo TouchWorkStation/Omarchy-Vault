@@ -66,14 +66,14 @@ func (a *app) doctor(ctx context.Context) int {
 	daemonUp := false
 	if err := a.getJSON(ctx, "/api/session", &st); err == nil {
 		daemonUp = true
-		add("daemon", lvOK, "Vault service is answering on http://%s", a.cfg.Listen)
+		add("daemon", lvOK, "Vault is on at http://%s", a.cfg.Listen)
 	} else {
 		conn, dErr := net.DialTimeout("tcp", a.cfg.Listen, time.Second)
 		if dErr == nil {
 			conn.Close()
 			add("port", lvFail, "something other than Vault is using %s", a.cfg.Listen)
 		} else {
-			add("daemon", lvWarn, "Vault service is not running; start it with: systemctl --user enable --now omarchy-vault")
+			add("daemon", lvInfo, "Vault is off (it only runs when you turn it on): vaultctl on")
 			add("port", lvOK, "%s is free", a.cfg.Listen)
 		}
 	}
@@ -189,15 +189,6 @@ func (a *app) doctor(ctx context.Context) int {
 			add("accounts", lvWarn, "no accounts yet; create yours with: vaultctl users add <name>")
 		} else {
 			add("accounts", lvOK, "%d account(s)", len(ul.Users))
-		}
-	}
-
-	// Keep running after logout (needed for a headless / always-on Vault).
-	if u := os.Getenv("USER"); u != "" && u != "root" {
-		if _, err := os.Stat("/var/lib/systemd/linger/" + u); err == nil {
-			add("always on", lvOK, "Vault keeps running when you log out")
-		} else {
-			add("always on", lvInfo, "Vault stops when you log out; to keep it running: sudo loginctl enable-linger %s", u)
 		}
 	}
 

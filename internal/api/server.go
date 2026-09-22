@@ -56,6 +56,8 @@ type Server struct {
 	// Static is the built web UI. When nil or empty a placeholder page is
 	// served instead.
 	Static fs.FS
+	// PowerOff stops vaultd (and with it the file service). Set by vaultd.
+	PowerOff func()
 	// Demo marks responses as sample data (vaultd --demo).
 	Demo    bool
 	Log     *slog.Logger
@@ -138,6 +140,7 @@ func (s *Server) Handler() http.Handler {
 	route("GET", "services", s.gate(admin, s.handleServices))
 	route("POST", "pool", s.gate(admin, s.handleAdopt))
 	route("DELETE", "pool", s.gate(admin, s.handleForget))
+	route("POST", "power/off", s.gate(admin, s.handlePowerOff))
 	route("GET", "users", s.gate(admin, s.handleListUsers))
 	route("POST", "users", s.gate(admin, s.handleCreateUser))
 	route("PUT", "users/{name}", s.gate(admin, s.handleUpdateUser))
@@ -475,4 +478,19 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, code, msg string) {
 	writeJSON(w, status, map[string]string{"error": code, "message": msg})
+}
+
+// handlePowerOff turns Vault off: the reply is sent first, then vaultd
+// shuts down cleanly (systemd does not restart a clean exit).
+func (s *Server) handlePowerOff(w http.ResponseWriter, r *http.Request) {
+	if s.PowerOff == nil {
+		writeError(w, http.StatusNotImplemented, "unavailable", "Vault cannot turn itself off in this mode.")
+		return
+	}
+	s.Log.Info("turning off", "by", identityFrom(r).Username)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Vault is turning off. Turn it on again with Super+Shift+V or `vaultctl on`."})
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		s.PowerOff()
+	}()
 }

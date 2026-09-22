@@ -1098,3 +1098,9 @@ select:focus {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+main.off {
+  max-width: 560px;
+  margin: 15vh auto;
+  padding: 0 16px;
+}

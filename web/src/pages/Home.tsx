@@ -44,7 +44,7 @@ export function Home() {
       <section className="page">
         <h1>VAULT</h1>
         <Notice tone="bad">
-          {error} Start it with <code>systemctl --user start omarchy-vault</code>, then reload.
+          {error} Vault is off. Turn it on with <code>vaultctl on</code> (or press Super+Shift+V), then reload.
         </Notice>
       </section>
     );

@@ -153,19 +153,23 @@ say "Installing user service"
 run install -d "$UNIT_DIR"
 run install -m 0644 "$REPO/systemd/omarchy-vault.service" "$UNIT_DIR/omarchy-vault.service"
 run systemctl --user daemon-reload
-if ask "Enable and start Vault now?"; then
-  run systemctl --user enable --now omarchy-vault.service
-  run systemctl --user restart omarchy-vault.service
-else
-  note "Start later with: systemctl --user enable --now omarchy-vault"
+# Vault runs only when you turn it on. The unit has no [Install] section,
+# so it cannot start at login; earlier installs that enabled it are undone.
+if systemctl --user is-enabled omarchy-vault.service >/dev/null 2>&1; then
+  note "Removing start-at-login from an earlier install"
+  run systemctl --user disable omarchy-vault.service
 fi
-if [[ ! -e "/var/lib/systemd/linger/$USER" ]]; then
-  note "Vault runs while you are logged in. To keep it running after you log out (always-on):"
-  if ask "Keep Vault running after logout (sudo loginctl enable-linger $USER)?"; then
-    run sudo loginctl enable-linger "$USER"
-  else
-    note "Later: sudo loginctl enable-linger $USER"
-  fi
+if [[ -e "/var/lib/systemd/linger/$USER" ]]; then
+  note "Note: 'linger' is on for $USER (from an earlier install or another app)."
+  note "Vault does not need it. To turn it off: sudo loginctl disable-linger $USER"
+fi
+if systemctl --user is-active omarchy-vault.service >/dev/null 2>&1; then
+  note "Vault is on; restarting it with the new version"
+  run systemctl --user restart omarchy-vault.service
+elif ask "Turn Vault on now? (it stays off until you turn it on)"; then
+  run systemctl --user start omarchy-vault.service
+else
+  note "Turn it on whenever you need it: vaultctl on  (or open it with vaultctl open)"
 fi
 
 # 9. Omarchy plugin files (not wired into the panel until it is ready).
@@ -187,8 +191,11 @@ fi
 say "Done"
 cat <<MSG
 
-    Set up storage:    vaultctl setup          (choose a drive, create your account)
-    Open Vault:        vaultctl open           (http://127.0.0.1:8788)
+    Turn on / off:     vaultctl on   |   vaultctl off
+    Set up storage:    vaultctl setup          (turns Vault on, opens the setup screens)
+    Open Vault:        vaultctl open           (turns Vault on, http://127.0.0.1:8788)
+
+    Vault never runs by itself: nothing starts at login or boot.
     Check everything:  vaultctl doctor
     See your drives:   vaultctl disks
 

@@ -46,6 +46,10 @@ A root-level attacker on the machine, physical theft of unencrypted drives (use 
 4. **vaultd → SFTPGo.** A child process on 127.0.0.1:8789, managed through its admin REST API (see "File service trust boundary").
 5. **vaultd → privileged helper** (planned, Milestone 7). See below.
 
+## Off by default
+
+Vault runs only when the user turns it on (`vaultctl on`, `vaultctl open`, the Super+Shift+V shortcut). The systemd user unit deliberately has no `[Install]` section, so it cannot start at login or boot, and the installer removes start-at-login from earlier versions. `vaultctl off` or the dashboard's **Turn off Vault** (admins only) stops vaultd and its file service; nothing keeps listening. The smallest attack surface is a service that isn't running.
+
 ## Accounts and sign-in (Milestone 3)
 
 - **Accounts** live in `~/.config/omarchy-vault/users.json` (0600). Each has an argon2id hash (46 MiB, t=1, p=1, 16-byte salt, PHC format). Plaintext passwords are never stored or logged. Hashing runs at most two at a time, to bound memory.

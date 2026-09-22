@@ -142,6 +142,16 @@ export function App() {
   const visible = routes.filter((r) => !r.admin || isAdmin);
   const blocked = routes.find((r) => r.path === path)?.admin && !isAdmin;
 
+  async function powerOff() {
+    if (!window.confirm("Turn Vault off? Files and uploads stop until you turn it on again.")) return;
+    try {
+      await send("POST", "/api/power/off");
+    } finally {
+      document.body.innerHTML =
+        '<main class="off"><h1>VAULT IS OFF</h1><p>Nothing is running in the background.</p><p>Turn it on again with Super+Shift+V or <code>vaultctl on</code>.</p></main>';
+    }
+  }
+
   async function signOut() {
     try {
       await send("POST", "/api/logout");
@@ -178,6 +188,11 @@ export function App() {
             {session.signed_in && (
               <button className="btn btn-small signout" onClick={signOut}>
                 Sign out
+              </button>
+            )}
+            {isAdmin && (
+              <button className="btn btn-small signout" onClick={powerOff}>
+                Turn off Vault
               </button>
             )}
           </div>

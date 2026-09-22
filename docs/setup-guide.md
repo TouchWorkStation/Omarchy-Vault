@@ -61,7 +61,7 @@ Then choose the section that matches your drive:
 
 ### 2.2 Mount it permanently (recommended)
 
-A permanent mount means the drive is always at the same folder, even before you log in. Vault needs that to stay online.
+A permanent mount means the drive is always at the same folder, so Vault finds it whenever you turn Vault on.
 
 **1. Get the drive's UUID.** Replace `sda1` with your partition:
 
@@ -200,8 +200,7 @@ The installer explains each step and asks before anything optional:
 | Config | Creates `~/.config/omarchy-vault` (private) | no |
 | `/srv/vault` | Creates the shortcut `/srv/vault` → your Vault (asks) | yes, once |
 | Programs | Installs `vaultd` and `vaultctl` to `~/.local/bin` | no |
-| Service | Installs and starts the `omarchy-vault` user service | no |
-| Always on | `loginctl enable-linger`, so Vault keeps running after you log out (asks) | yes, once |
+| Service | Installs the `omarchy-vault` user service. It **never starts by itself**; the installer asks whether to turn it on now | no |
 | Shortcuts | Checks Super+Shift+V/U/D for conflicts. Changes nothing | no |
 
 If `vaultctl` is "not found", add `~/.local/bin` to your PATH:
@@ -217,6 +216,18 @@ vaultctl doctor
 ```
 
 ---
+
+### Turning Vault on and off
+
+Vault only runs when you turn it on. Nothing starts at login or boot, and nothing stays in the background after you turn it off.
+
+```sh
+vaultctl on        # turn on (Files starts too, once your drive is ready)
+vaultctl off       # turn off (stops Files too)
+vaultctl status    # is it on?
+```
+
+Opening Vault turns it on for you: `vaultctl open`, `vaultctl setup`, or the Super+Shift+V shortcut. Admins can also click **Turn off Vault** in the dashboard sidebar.
 
 ## 4. First-run setup
 
@@ -270,7 +281,7 @@ Files is your Vault in the browser: browse, upload, download (folders as zip), c
 
 In this version, Vault's pages (and Files) are reachable **from this computer only**. Reaching Vault from phones and other computers arrives with Remote Access (Milestone 6), which adds encryption (TLS). Until then, please don't open Vault to your network by changing `listen`.
 
-If Files says it is not installed, run `./scripts/build-sftpgo.sh` (or re-run the installer), then `systemctl --user restart omarchy-vault`.
+If Files says it is not installed, run `./scripts/build-sftpgo.sh` (or re-run the installer), then `vaultctl off && vaultctl on`.
 
 ---
 
@@ -322,9 +333,10 @@ Open **Account** (click your name in the sidebar):
 
 ## 7. Everyday use
 
-- **Open Vault:** `vaultctl open`, or add the shortcut (see the README "Shortcuts" section): `bindd = SUPER SHIFT, V, Open Vault, exec, vaultctl open` in `~/.config/hypr/bindings.conf`.
+- **Turn on / off:** `vaultctl on` / `vaultctl off`. Vault never runs unless you turn it on.
+- **Open Vault:** `vaultctl open` (turns it on if needed), or add the shortcut (see the README "Shortcuts" section): `bindd = SUPER SHIFT, V, Open Vault, exec, vaultctl open` in `~/.config/hypr/bindings.conf`.
 - **Status at a glance:** `vaultctl status`, or the Home page.
-- **Drive unplugged or not mounted:** Vault shows your storage as *Offline*, pauses Files, and never writes anything to your system drive in the meantime. Plug the drive back in (or `sudo mount -a`) and everything resumes within about 20 seconds.
+- **Drive unplugged or not mounted (while Vault is on):** Vault shows your storage as *Offline*, pauses Files, and never writes anything to your system drive in the meantime. Plug the drive back in (or `sudo mount -a`) and everything resumes within about 20 seconds.
 - **Drive mounted somewhere else:** Vault shows *Drive moved*. Choose it again in Storage → *Use it at its new location*.
 - **Change drives:** Storage → Change drive. Files on the old drive stay there. Copy them over if you want them in the new Vault.
 - **Stop using a drive:** Storage → Stop using this drive (or `vaultctl storage forget`). Nothing is deleted.
@@ -343,19 +355,19 @@ vaultctl logs -f        # live log of the Vault service
 
 | Problem | Fix |
 |---|---|
-| `vaultctl: the Vault service is not running` | `systemctl --user enable --now omarchy-vault`, then check `vaultctl logs` |
+| `vaultctl on` fails | Check `vaultctl logs`; re-run `./scripts/install.sh` if the service is missing |
 | My drive is not listed under "Drives Vault can use" | It isn't mounted, or it's mounted somewhere Vault avoids (`/var`, `/usr`, `/tmp`, `/root`…). Mount it under `/mnt/…` (section 2.2) |
 | Drive shows **Not mounted** | Mount it (2.2 or 2.3). Vault never mounts drives itself |
 | Drive shows **Can't use: No filesystem** | It's blank. See 2.4 (erases it) |
 | Drive shows **Encrypted volume not unlocked** | Unlock it first (2.5) |
 | Drive shows **Read-only** | Check the filesystem (`sudo dmesg \| tail`) or the mount options in `/etc/fstab` |
 | "Permission denied" when uploading | The drive folder isn't owned by you: `sudo chown "$USER:$USER" /mnt/vault-disk1/Vault` (ext4/xfs/btrfs), or add `uid=`/`gid=` for exFAT/NTFS (2.2) |
-| Files says "not installed" | `./scripts/build-sftpgo.sh`, then `systemctl --user restart omarchy-vault` |
+| Files says "not installed" | `./scripts/build-sftpgo.sh`, then `vaultctl off && vaultctl on` |
 | Files says "waiting for storage" | Your drive is offline; see "Drive unplugged" above |
 | Forgot the admin password | On this computer: `vaultctl users reset-password <name>` (the terminal is trusted as the owner) |
 | Locked out after wrong passwords | Wait 1–15 minutes, or reset the password from the terminal |
 | "That sign-in link expired" | Open Vault again with `vaultctl open` (links from it work once, for 30 seconds) |
-| Vault stops when I log out | `sudo loginctl enable-linger "$USER"` |
+| "Vault is off" | That's the default. Turn it on with `vaultctl on` or open it with `vaultctl open` |
 | Could not identify the system drive | Vault then refuses every drive, to be safe. Run `vaultctl disks` and `findmnt /`, and report it as an issue |
 
 ---

@@ -33,7 +33,9 @@ Usage:
   vaultctl <command> [flags]
 
 Commands:
-  status          Vault daemon status
+  on              Turn Vault on (it never starts by itself)
+  off             Turn Vault off (stops Files too)
+  status          Vault status
   disks           List drives (SYSTEM drives are protected)
   setup           Open the setup screens in your browser
   storage         Vault storage and drives that could be used
@@ -56,7 +58,7 @@ Commands:
   download        Download from Vault: Vault -> Phone   (Milestone 5)
   share <file>    Create a share link                   (Milestone 5)
   shortcuts       Check Vault shortcuts for conflicts (never installs)
-  open            Open the Vault dashboard
+  open            Open the Vault dashboard (turns Vault on if needed)
   doctor          Check that everything Vault needs is in place
   logs [-f]       Show Vault service logs
   version         Print version
@@ -108,6 +110,10 @@ func realMain(args []string) int {
 	switch cmd {
 	case "version":
 		fmt.Fprintf(a.out, "vaultctl %s (commit %s, milestone %d)\n", version.Version, version.Commit, version.Milestone)
+	case "on":
+		err = a.powerOn(ctx)
+	case "off":
+		err = a.powerOff(ctx)
 	case "status":
 		err = a.status(ctx)
 	case "disks":
@@ -115,7 +121,9 @@ func realMain(args []string) int {
 	case "storage":
 		err = a.storageCmd(ctx, cmdArgs)
 	case "setup":
-		err = a.openPage(ctx, "/setup")
+		if err = a.ensureOn(ctx); err == nil {
+			err = a.openPage(ctx, "/setup")
+		}
 	case "link":
 		err = a.linkRoot(cmdArgs)
 	case "pool":
@@ -144,7 +152,9 @@ func realMain(args []string) int {
 	case "shortcuts":
 		err = a.shortcuts(ctx)
 	case "open":
-		err = a.openPage(ctx, "/")
+		if err = a.ensureOn(ctx); err == nil {
+			err = a.openPage(ctx, "/")
+		}
 	case "doctor":
 		return a.doctor(ctx)
 	case "logs":
@@ -177,7 +187,7 @@ func (a *app) baseURL() string {
 	return "http://" + a.cfg.Listen
 }
 
-var errDaemonDown = errors.New("the Vault service is not running (start it with: systemctl --user start omarchy-vault)")
+var errDaemonDown = errors.New("Vault is off. Turn it on with: vaultctl on")
 
 func (a *app) getJSON(ctx context.Context, path string, v any) error {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)

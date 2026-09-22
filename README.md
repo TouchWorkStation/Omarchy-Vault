@@ -56,14 +56,16 @@ git clone https://github.com/TouchWorkStation/Omarchy-Vault.git ~/Omarchy-Vault
 cd ~/Omarchy-Vault
 
 ./scripts/install.sh --dry-run   # see exactly what will happen
-./scripts/install.sh             # build Vault + the file service, install for your user, start it
-vaultctl setup                   # choose your drive and create your account in the browser
+./scripts/install.sh             # build Vault + the file service, install for your user
+vaultctl setup                   # turns Vault on, then choose your drive and create your account
 ```
 
-Everyday commands:
+Vault **only runs when you turn it on**. Nothing starts at login or boot.
 
 ```sh
-vaultctl open                    # open the dashboard, signed in
+vaultctl on                      # turn on
+vaultctl off                     # turn off (stops Files too)
+vaultctl open                    # open the dashboard, signed in (turns Vault on if needed)
 vaultctl users                   # list accounts; `vaultctl users add ann --role family`
 vaultctl storage                 # your Vault drive and drives you could use
 vaultctl doctor                  # check everything

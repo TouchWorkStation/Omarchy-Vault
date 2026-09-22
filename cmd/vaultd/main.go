@@ -190,6 +190,7 @@ func run() error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	srv.PowerOff = stop
 
 	// Background workers: the file service and the storage monitor that
 	// starts/stops it as the drive comes and goes.

@@ -245,3 +245,17 @@ func TestFilesPageIsNotProxied(t *testing.T) {
 		t.Fatalf("/files = %d %q (should be the dashboard page)", w.Code, w.Header().Get("Location"))
 	}
 }
+
+func TestPowerOffAdminOnly(t *testing.T) {
+	e := newEnv(t)
+	admin := bootstrap(t, e)
+	e.req("POST", "/api/users", map[string]any{"username": "ann", "password": "family-pass-123", "role": "family"}, admin)
+	ann := session(t, e.login(t, "ann", "family-pass-123", ""))
+	if w := e.req("POST", "/api/power/off", nil, ann); w.Code != http.StatusForbidden {
+		t.Errorf("family power off = %d", w.Code)
+	}
+	// Without a PowerOff hook the server refuses rather than pretending.
+	if w := e.req("POST", "/api/power/off", nil, admin); w.Code != http.StatusNotImplemented {
+		t.Errorf("admin power off without hook = %d", w.Code)
+	}
+}

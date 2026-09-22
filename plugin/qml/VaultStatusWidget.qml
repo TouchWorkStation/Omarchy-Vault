@@ -1,7 +1,8 @@
 import QtQuick
 
-// Compact status for a bar: "VAULT 7.2 TB / 20 TB" or "VAULT not set up".
-// Polls the local API once a minute; the host decides what a click does.
+// Compact status for a bar: "VAULT 7.2 TB / 20 TB", "VAULT not set up" or
+// "VAULT off". Polls the local API once a minute and never starts Vault; the
+// host decides what a click does (e.g. run `vaultctl open`).
 Item {
     id: root
     property string apiUrl: "http://127.0.0.1:8788/api/status"
@@ -37,7 +38,7 @@ Item {
     }
 
     readonly property string text: {
-        if (!reachable) return "VAULT offline"
+        if (!reachable) return "VAULT off"
         if (!status || !status.setup_complete) return "VAULT not set up"
         return "VAULT " + human(status.storage.used_bytes) + " / " + human(status.storage.total_bytes)
     }
