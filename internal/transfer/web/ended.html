@@ -15,7 +15,7 @@
     <h1>LINK ENDED</h1>
   </header>
   <p>{{.Message}}</p>
-  <p class="muted">Ask for a new code: press Super + Shift + U on the Vault computer.</p>
+  {{if .Hint}}<p class="muted">{{.Hint}}</p>{{end}}
 </main>
 </body>
 </html>

@@ -187,83 +187,16 @@ func (s *Server) handleCreateUpload(w http.ResponseWriter, r *http.Request) {
 	if client == "" {
 		client = "dashboard"
 	}
-	sess, token, err := s.Transfers.Create(r.Context(), transfer.NewSession{
-		Kind: transfer.KindUpload, Folder: req.Folder, CreatedBy: identityFrom(r).Username, Client: client,
+	s.issue(w, r, transfer.NewSession{
+		Kind: transfer.KindUpload, Folder: req.Folder, Client: client,
 		TTL: time.Duration(minutes) * time.Minute, MaxFiles: uploadMaxFiles, MaxBytes: uploadMaxBytes,
 	})
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "Something went wrong.")
-		return
-	}
-	base, err := s.Transfer.Ensure()
-	if err != nil {
-		_ = s.Transfers.Revoke(r.Context(), sess.ID)
-		s.Log.Warn("transfer listener unavailable", "err", err)
-		writeError(w, http.StatusServiceUnavailable, "no_network", "Your phone can't reach this computer: "+err.Error()+".")
-		return
-	}
-	url := transfer.Link(base, token)
-	s.links.put(sess.ID, url)
-	s.Log.Info("upload link created", "id", sess.ID, "folder", sess.Folder, "minutes", minutes, "by", sess.CreatedBy)
-	writeJSON(w, http.StatusOK, s.linkView(r.Context(), sess, true))
 }
 
 // ownsLink: admins see every link, others only their own.
 func (s *Server) ownsLink(r *http.Request, sess transfer.Session) bool {
 	id := identityFrom(r)
 	return id.Role == string(users.Admin) || sess.CreatedBy == id.Username
-}
-
-func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
-	out := []LinkView{}
-	if s.Transfers != nil {
-		active, err := s.Transfers.Active(r.Context())
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "internal", "Something went wrong.")
-			return
-		}
-		for _, sess := range active {
-			if sess.Kind == transfer.KindUpload && s.ownsLink(r, sess) {
-				out = append(out, s.linkView(r.Context(), sess, true))
-			}
-		}
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"links": out, "listening": s.Transfer != nil && s.Transfer.Running() != ""})
-}
-
-func (s *Server) handleGetUpload(w http.ResponseWriter, r *http.Request) {
-	if s.Transfers == nil {
-		writeError(w, http.StatusNotFound, "not_found", "No such link.")
-		return
-	}
-	sess, err := s.Transfers.Get(r.Context(), r.PathValue("id"))
-	if err != nil || !s.ownsLink(r, sess) {
-		writeError(w, http.StatusNotFound, "not_found", "No such link.")
-		return
-	}
-	writeJSON(w, http.StatusOK, s.linkView(r.Context(), sess, true))
-}
-
-func (s *Server) handleStopUpload(w http.ResponseWriter, r *http.Request) {
-	if s.Transfers == nil {
-		writeError(w, http.StatusNotFound, "not_found", "No such link.")
-		return
-	}
-	id := r.PathValue("id")
-	sess, err := s.Transfers.Get(r.Context(), id)
-	if err != nil || !s.ownsLink(r, sess) {
-		writeError(w, http.StatusNotFound, "not_found", "No such link.")
-		return
-	}
-	if err := s.Transfers.Revoke(r.Context(), id); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "Something went wrong.")
-		return
-	}
-	s.links.drop(id)
-	s.Transfer.StopIfIdle(r.Context())
-	s.Log.Info("upload link stopped", "id", id, "by", identityFrom(r).Username)
-	sess, _ = s.Transfers.Get(r.Context(), id)
-	writeJSON(w, http.StatusOK, s.linkView(r.Context(), sess, false))
 }
 
 func (s *Server) handleActivity(w http.ResponseWriter, r *http.Request) {

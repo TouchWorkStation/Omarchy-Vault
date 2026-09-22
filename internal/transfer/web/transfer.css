@@ -24,3 +24,15 @@ li .ok { color: var(--accent); }
 li .bad { color: var(--bad); }
 button.primary { width: 100%; min-height: 52px; border: 0; border-radius: 10px; background: var(--accent); color: #0b0c0c; font: inherit; font-weight: 700; font-size: 17px; margin-top: 8px; }
 .error { color: var(--bad); border: 1px solid var(--bad); border-radius: 10px; padding: 12px; }
+a.primary { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 52px; border-radius: 10px; background: var(--accent); color: #0b0c0c; font-weight: 700; font-size: 17px; margin-top: 16px; text-decoration: none; }
+.item { display: flex; gap: 14px; align-items: center; margin-top: 24px; padding: 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.item .icon { font-size: 26px; }
+.item-name { margin: 0 0 4px; color: var(--strong); font-weight: 600; word-break: break-word; }
+.item p { margin: 0; }
+.center { text-align: center; }
+ul.files { max-height: none; margin-top: 18px; }
+ul.files a { display: flex; justify-content: space-between; gap: 12px; width: 100%; color: var(--ink); text-decoration: none; }
+ul.files a span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unlock { display: grid; gap: 10px; margin-top: 24px; }
+.unlock input { min-height: 50px; padding: 0 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--strong); font: inherit; }
+.unlock input:focus { outline: none; border-color: var(--accent); }

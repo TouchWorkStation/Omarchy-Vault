@@ -1,6 +1,6 @@
 // Package transfer implements Vault's phone transfers: short-lived,
-// single-purpose links shown as QR codes. Milestone 4 adds uploads
-// (phone → Vault); downloads (Vault → phone) build on the same store.
+// single-purpose links shown as QR codes: uploads (phone → Vault),
+// downloads (Vault → phone) and read-only share links.
 //
 // Tokens are 256-bit random values. Only their SHA-256 hash is stored, so
 // the database never holds a usable link.
@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"time"
@@ -25,14 +26,26 @@ import (
 type Kind string
 
 const (
-	KindUpload Kind = "upload"
+	KindUpload   Kind = "upload"
+	KindDownload Kind = "download"
+	KindShare    Kind = "share"
 )
 
-// Session is a transfer link as stored.
+// Unlimited is the MaxFiles value of a link with no download limit.
+const Unlimited = math.MaxInt32
+
+// NoByteLimit is the MaxBytes value of download and share links.
+const NoByteLimit = int64(1) << 62
+
+// Session is a transfer link as stored. For uploads Folder is where files
+// go and Files/MaxFiles count files received. For downloads and shares
+// Path is the Vault-relative file or folder offered, Folder its top-level
+// Vault folder, and Files/MaxFiles count downloads.
 type Session struct {
 	ID        string    `json:"id"`
 	Kind      Kind      `json:"kind"`
 	Folder    string    `json:"folder"`
+	Path      string    `json:"path,omitempty"`
 	CreatedBy string    `json:"created_by"`
 	Client    string    `json:"client"`
 	CreatedAt time.Time `json:"created_at"`
@@ -42,6 +55,19 @@ type Session struct {
 	MaxBytes  int64     `json:"max_bytes"`
 	Files     int       `json:"files"`
 	Bytes     int64     `json:"bytes"`
+	// HasPassword is set for share links that need a password.
+	HasPassword bool `json:"has_password"`
+
+	passwordHash string
+}
+
+// CheckPassword verifies a share link's password (argon2id). Links without
+// one accept any value.
+func (s Session) CheckPassword(pw string) bool {
+	if s.passwordHash == "" {
+		return true
+	}
+	return auth.VerifyPassword(pw, s.passwordHash)
 }
 
 // Active reports whether the session can still be used at t.
@@ -94,6 +120,37 @@ CREATE INDEX IF NOT EXISTS activity_at ON activity(at);
 CREATE INDEX IF NOT EXISTS activity_session ON activity(session_id);
 `
 
+// migrations add columns introduced after a database was created.
+var migrations = []struct{ column, def string }{
+	{"path", "TEXT NOT NULL DEFAULT ''"},          // Milestone 5
+	{"password_hash", "TEXT NOT NULL DEFAULT ''"}, // Milestone 5
+}
+
+func migrate(db *sql.DB) error {
+	have := map[string]bool{}
+	rows, err := db.Query(`SELECT name FROM pragma_table_info('sessions')`)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			rows.Close()
+			return err
+		}
+		have[name] = true
+	}
+	rows.Close()
+	for _, m := range migrations {
+		if !have[m.column] {
+			if _, err := db.Exec(`ALTER TABLE sessions ADD COLUMN ` + m.column + ` ` + m.def); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // Open opens (creating if needed) the database at path with 0600
 // permissions in a 0700 directory.
 func Open(path string) (*Store, error) {
@@ -112,6 +169,10 @@ func Open(path string) (*Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("transfer: init db: %w", err)
+	}
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("transfer: upgrade db: %w", err)
 	}
 	return &Store{db: db, Now: time.Now}, nil
 }
@@ -140,6 +201,9 @@ type NewSession struct {
 	TTL       time.Duration
 	MaxFiles  int
 	MaxBytes  int64
+	// Path and PasswordHash are for downloads and shares.
+	Path         string
+	PasswordHash string
 }
 
 // Create stores a session and returns it with its one-time token. The
@@ -157,19 +221,20 @@ func (s *Store) Create(ctx context.Context, n NewSession) (Session, string, erro
 	sess := Session{
 		ID: id, Kind: n.Kind, Folder: n.Folder, CreatedBy: n.CreatedBy, Client: n.Client,
 		CreatedAt: now, ExpiresAt: now.Add(n.TTL), MaxFiles: n.MaxFiles, MaxBytes: n.MaxBytes,
+		Path: n.Path, HasPassword: n.PasswordHash != "", passwordHash: n.PasswordHash,
 	}
 	_, err = s.db.ExecContext(ctx, `INSERT INTO sessions
-		(id, token_hash, kind, folder, created_by, client, created_at, expires_at, max_files, max_bytes)
-		VALUES (?,?,?,?,?,?,?,?,?,?)`,
+		(id, token_hash, kind, folder, created_by, client, created_at, expires_at, max_files, max_bytes, path, password_hash)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
 		sess.ID, tokenHash(token), string(sess.Kind), sess.Folder, sess.CreatedBy, sess.Client,
-		sess.CreatedAt.UnixMilli(), sess.ExpiresAt.UnixMilli(), sess.MaxFiles, sess.MaxBytes)
+		sess.CreatedAt.UnixMilli(), sess.ExpiresAt.UnixMilli(), sess.MaxFiles, sess.MaxBytes, sess.Path, n.PasswordHash)
 	if err != nil {
 		return Session{}, "", err
 	}
 	return sess, token, nil
 }
 
-const cols = `id, kind, folder, created_by, client, created_at, expires_at, revoked_at, max_files, max_bytes, files, bytes`
+const cols = `id, kind, folder, created_by, client, created_at, expires_at, revoked_at, max_files, max_bytes, files, bytes, path, password_hash`
 
 func scan(row interface{ Scan(...any) error }) (Session, error) {
 	var sess Session
@@ -177,7 +242,7 @@ func scan(row interface{ Scan(...any) error }) (Session, error) {
 	var created, expires int64
 	var revoked sql.NullInt64
 	err := row.Scan(&sess.ID, &kind, &sess.Folder, &sess.CreatedBy, &sess.Client, &created, &expires,
-		&revoked, &sess.MaxFiles, &sess.MaxBytes, &sess.Files, &sess.Bytes)
+		&revoked, &sess.MaxFiles, &sess.MaxBytes, &sess.Files, &sess.Bytes, &sess.Path, &sess.passwordHash)
 	if err != nil {
 		return Session{}, err
 	}
@@ -185,6 +250,7 @@ func scan(row interface{ Scan(...any) error }) (Session, error) {
 	sess.CreatedAt = time.UnixMilli(created)
 	sess.ExpiresAt = time.UnixMilli(expires)
 	sess.Revoked = revoked.Valid
+	sess.HasPassword = sess.passwordHash != ""
 	return sess, nil
 }
 
@@ -258,8 +324,8 @@ func (s *Store) Revoke(ctx context.Context, id string) error {
 // ErrLimit means a file would exceed the session's limits.
 var ErrLimit = errors.New("transfer: limit reached")
 
-// Reserve claims room for one file of up to size bytes (size may be 0 if
-// unknown). It fails if the session is no longer usable or full.
+// Reserve claims one file (upload) or one download. It fails if the
+// session is revoked or its count is used up.
 func (s *Store) Reserve(ctx context.Context, id string) error {
 	res, err := s.db.ExecContext(ctx, `UPDATE sessions SET files = files + 1
 		WHERE id = ? AND revoked_at IS NULL AND files < max_files AND bytes < max_bytes`, id)
@@ -277,7 +343,7 @@ func (s *Store) Release(ctx context.Context, id string) {
 	_, _ = s.db.ExecContext(ctx, `UPDATE sessions SET files = MAX(files - 1, 0) WHERE id = ?`, id)
 }
 
-// Record adds a saved file's bytes to the session and logs it.
+// Record adds a transferred file's bytes to the session and logs it.
 func (s *Store) Record(ctx context.Context, sess Session, name string, size int64) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -317,7 +383,7 @@ type Item struct {
 	Actor  string    `json:"actor"`
 }
 
-// Received lists files saved through one session, oldest first.
+// Received lists files transferred through one session, oldest first.
 func (s *Store) Received(ctx context.Context, sessionID string) ([]Item, error) {
 	return s.items(ctx, `SELECT at, kind, folder, name, size, actor FROM activity WHERE session_id = ? ORDER BY id`, sessionID)
 }

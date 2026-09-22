@@ -83,9 +83,22 @@ type Server struct {
 	srv     *http.Server
 	addr    string
 	limiter *auth.LoginLimiter
+	limOnce sync.Once
 	// inflight counts uploads in progress, so a link expiring mid-upload
 	// does not cut off a video that is still arriving.
 	inflight atomic.Int32
+
+	gmu sync.Mutex
+	// counted remembers which device already downloaded what, so resuming
+	// or re-opening a file doesn't use up a link (key: session|ip|file).
+	counted map[string]time.Time
+	// unlocked holds share password grants (key: cookie value).
+	unlocked map[string]grant
+}
+
+type grant struct {
+	session string
+	expires time.Time
 }
 
 // Address returns the host:port phones should use, detecting the LAN
@@ -132,9 +145,6 @@ func (s *Server) Ensure() (string, error) {
 			return "", fmt.Errorf("port %s is in use by another program", addr)
 		}
 		return "", fmt.Errorf("could not listen on %s: %w", addr, err)
-	}
-	if s.limiter == nil {
-		s.limiter = auth.NewLoginLimiter()
 	}
 	s.ln, s.addr = ln, ln.Addr().String()
 	s.srv = &http.Server{
@@ -192,6 +202,7 @@ func (s *Server) Run(ctx context.Context) {
 			return
 		case <-t.C:
 			s.StopIfIdle(ctx)
+			s.pruneGrants()
 		}
 	}
 }
@@ -208,14 +219,26 @@ func securityHeaders(w http.ResponseWriter) {
 
 var pages = template.Must(template.ParseFS(webFS, "web/*.html"))
 
-// Handler serves only /u/<token>, its upload endpoint and static assets.
+// Handler serves only transfer pages: /u/ (upload), /d/ (download) and
+// /s/ (share) for a valid token, and static assets.
 func (s *Server) Handler() http.Handler {
+	s.limOnce.Do(func() {
+		if s.limiter == nil {
+			s.limiter = auth.NewLoginLimiter()
+		}
+	})
 	mux := http.NewServeMux()
 	static, _ := fs.Sub(webFS, "web")
 	mux.Handle("GET /t/", http.StripPrefix("/t/", http.FileServerFS(static)))
 	mux.HandleFunc("GET /u/{token}", s.page)
 	mux.HandleFunc("GET /u/{token}/info", s.info)
 	mux.HandleFunc("POST /u/{token}/files", s.receive)
+	mux.HandleFunc("GET /d/{token}", s.downloadPage)
+	mux.HandleFunc("GET /d/{token}/file", s.downloadFile)
+	mux.HandleFunc("GET /s/{token}", s.sharePage)
+	mux.HandleFunc("POST /s/{token}/unlock", s.shareUnlock)
+	mux.HandleFunc("GET /s/{token}/file", s.shareFile)
+	mux.HandleFunc("GET /s/{token}/zip", s.shareZip)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		securityHeaders(w)
 		http.NotFound(w, r)
@@ -239,15 +262,21 @@ func clientIP(r *http.Request) string {
 	return h
 }
 
-// lookup validates the token, slowing down clients that guess.
+// lookup validates an upload token, slowing down clients that guess.
 func (s *Server) lookup(r *http.Request) (Session, error) {
+	return s.lookupKind(r, KindUpload)
+}
+
+// lookupKind validates a token of one kind. Wrong tokens count towards a
+// per-address lockout.
+func (s *Server) lookupKind(r *http.Request, kind Kind) (Session, error) {
 	ip := "ip:" + clientIP(r)
 	if s.limiter != nil {
 		if _, blocked := s.limiter.Blocked(ip); blocked {
 			return Session{}, ErrNotFound
 		}
 	}
-	sess, err := s.Store.Lookup(r.Context(), r.PathValue("token"), KindUpload)
+	sess, err := s.Store.Lookup(r.Context(), r.PathValue("token"), kind)
 	if errors.Is(err, ErrNotFound) && s.limiter != nil {
 		s.limiter.Fail(ip)
 	}
@@ -271,6 +300,22 @@ type pageData struct {
 	Folder  string
 	Expires int64
 	Message string
+	Hint    string
+	// Downloads and shares.
+	Token    string
+	Name     string
+	Size     string
+	IsDir    bool
+	Count    int
+	Files    []fileRow
+	More     int
+	Error    string
+	LimitMsg string
+}
+
+type fileRow struct {
+	Path string
+	Size string
 }
 
 func (s *Server) page(w http.ResponseWriter, r *http.Request) {
@@ -279,7 +324,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	sess, err := s.lookup(r)
 	if err != nil {
 		w.WriteHeader(http.StatusGone)
-		_ = pages.ExecuteTemplate(w, "ended.html", pageData{Message: friendly(err)})
+		_ = pages.ExecuteTemplate(w, "ended.html", pageData{Message: friendly(err), Hint: "Ask for a new code: press Super + Shift + U on the Vault computer."})
 		return
 	}
 	_ = pages.ExecuteTemplate(w, "upload.html", pageData{Folder: sess.Folder, Expires: sess.ExpiresAt.UnixMilli()})
@@ -460,5 +505,11 @@ func (l *ipLimiter) allow(key string) bool {
 
 // Link builds the phone URL for a token.
 func Link(base, token string) string {
-	return strings.TrimRight(base, "/") + "/u/" + token
+	return LinkFor(base, KindUpload, token)
+}
+
+// LinkFor builds the phone URL for a link of the given kind.
+func LinkFor(base string, kind Kind, token string) string {
+	prefix := map[Kind]string{KindUpload: "/u/", KindDownload: "/d/", KindShare: "/s/"}[kind]
+	return strings.TrimRight(base, "/") + prefix + token
 }

@@ -1,6 +1,6 @@
 # Omarchy Vault setup guide
 
-This guide takes you from a spare drive to a working Vault with your own account, family accounts, a file browser, and phone uploads by QR code. Follow the parts in order the first time.
+This guide takes you from a spare drive to a working Vault with your own account, family accounts, a file browser, phone transfers by QR code in both directions, and share links. Follow the parts in order the first time.
 
 1. [What you need](#1-what-you-need)
 2. [Prepare your drive](#2-prepare-your-drive)
@@ -10,9 +10,10 @@ This guide takes you from a spare drive to a working Vault with your own account
 6. [Users](#6-users)
 7. [Keyboard shortcuts](#7-keyboard-shortcuts)
 8. [Upload from your phone](#8-upload-from-your-phone)
-9. [Everyday use](#9-everyday-use)
-10. [Troubleshooting](#10-troubleshooting)
-11. [Uninstall](#11-uninstall)
+9. [Download to your phone and share links](#9-download-to-your-phone-and-share-links)
+10. [Everyday use](#10-everyday-use)
+11. [Troubleshooting](#11-troubleshooting)
+12. [Uninstall](#12-uninstall)
 
 > **Vault never formats, partitions, erases or mounts drives.** It only uses a drive that is already mounted. Section 2 shows the few one-time commands *you* run to get a drive ready. Read each one before you run it.
 
@@ -179,7 +180,7 @@ Drives Vault can use:
   sda1       WDC WD80EFZZ-68BTXN0       /mnt/vault-disk1             5.3 TB free of 7.9 TB
 ```
 
-If your drive is missing or not usable, see [Troubleshooting](#10-troubleshooting).
+If your drive is missing or not usable, see [Troubleshooting](#11-troubleshooting).
 
 ---
 
@@ -341,7 +342,7 @@ Vault can add these, but only when you ask and only if they are free:
 |---|---|
 | Super + Shift + V | Open Vault |
 | Super + Shift + U | Upload to Vault (phone → Vault) |
-| Super + Shift + D | Download from Vault (Milestone 5) |
+| Super + Shift + D | Download from Vault (Vault → phone) |
 
 ```sh
 vaultctl shortcuts             # check: which are free, which are taken and by what
@@ -389,11 +390,43 @@ In a terminal only? `vaultctl upload --terminal` prints the QR code in the termi
 
 ---
 
-## 9. Everyday use
+## 9. Download to your phone and share links
+
+The phone setup from section 8 (same Wi-Fi, firewall rule for port 8790) applies here too.
+
+**Send a file or folder to your phone**
+
+1. Press **Super + Shift + D** (or click **Download** in the dashboard). Vault turns on if it was off and shows your Vault's folders.
+2. Click a file or folder to choose it (**Open ›** goes into a folder). A folder arrives on the phone as one `.zip` file.
+3. Keep **To my phone**, choose how long the code works (10 minutes by default) and how many phones may use it (once by default), then **Show QR code**.
+4. Scan it with the phone's camera and tap **Download**. The screen on the computer says *Done* when it has been downloaded.
+
+From a terminal: `vaultctl download "/srv/vault/Photos/2024/beach.jpg"` (or the Vault path, `Photos/2024/beach.jpg`), with `--terminal` to print the QR code in the terminal, `--minutes 30`, `--downloads 3`.
+
+An interrupted download can be retried from the same phone until the code expires; it isn't counted twice.
+
+**Share links**
+
+For sending something to someone else (on your network for now; over the internet once remote access arrives in Milestone 6):
+
+1. In **Download**, choose the file or folder, then **Share link**.
+2. Pick how long it works (10 minutes to 30 days), how many downloads (one, up to 5, up to 25, or unlimited until it expires) and, if you like, a password.
+3. **Create share link** shows a QR code and the link with a **Copy** button.
+
+Share links are read only: people can download, never change or delete. A shared folder shows its files one by one and as **Download all (.zip)**. All your active links are listed under **Download → Share links**, with **Stop** to end one immediately. From a terminal: `vaultctl share Photos/2024 --expires 7d --downloads 5 --password`.
+
+Who can do what: admins everything; family members can send and share from folders they can open; guests can send to their own phone but can't create share links.
+
+While a share link is active Vault keeps its phone port open (only for that link's page), so stop shares you no longer need.
+
+---
+
+## 10. Everyday use
 
 - **Turn on / off:** `vaultctl on` / `vaultctl off`. Vault never runs unless you turn it on.
 - **Open Vault:** `vaultctl open` (turns it on if needed), or Super + Shift + V once you've installed the shortcuts (section 7).
 - **Phone → Vault:** Super + Shift + U or `vaultctl upload` (section 8).
+- **Vault → Phone, share links:** Super + Shift + D or `vaultctl download` / `vaultctl share` (section 9).
 - **Status at a glance:** `vaultctl status`, or the Home page.
 - **Drive unplugged or not mounted (while Vault is on):** Vault shows your storage as *Offline*, pauses Files, and never writes anything to your system drive in the meantime. Plug the drive back in (or `sudo mount -a`) and everything resumes within about 20 seconds.
 - **Drive mounted somewhere else:** Vault shows *Drive moved*. Choose it again in Storage → *Use it at its new location*.
@@ -403,7 +436,7 @@ In a terminal only? `vaultctl upload --terminal` prints the QR code in the termi
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 Start with:
 
@@ -430,12 +463,15 @@ vaultctl logs -f        # live log of the Vault service
 | Phone says "can't connect" / page never loads | Phone on the same Wi-Fi (not mobile data, not a guest network)? Firewall rule from section 8 added? Some routers isolate Wi-Fi devices ("AP/client isolation"); turn that off for your home network |
 | "Your phone can't reach this computer: not connected to a local network" | The computer has no private network address (e.g. only a VPN). Connect to your home Wi-Fi/Ethernet, or set `"transfer": {"host": "<your LAN IP>"}` in `~/.config/omarchy-vault/config.json` |
 | "port 8790 is in use by another program" | Set another port: `"transfer": {"port": 8791}` in config.json (and allow it in ufw) |
-| "LINK ENDED" on the phone | The code expired or was stopped. Press Super + Shift + U for a new one |
+| "LINK ENDED" on the phone | The code expired, was stopped or was used up. Make a new one (Super + Shift + U or D) |
+| Share link asks for a password you don't have | Ask the person who shared it. After several wrong tries it waits 1–15 minutes |
+| "That folder has too many files" | Folder links hold up to 20 000 files; share a smaller folder |
+| A second phone can't download | The code was for one download. Choose more downloads, or make a new code |
 | Could not identify the system drive | Vault then refuses every drive, to be safe. Run `vaultctl disks` and `findmnt /`, and report it as an issue |
 
 ---
 
-## 11. Uninstall
+## 12. Uninstall
 
 ```sh
 cd ~/Omarchy-Vault

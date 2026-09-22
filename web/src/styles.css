@@ -1158,3 +1158,21 @@ main.off {
 .ok-glyph {
   color: var(--good);
 }
+
+/* Milestone 5: download picker */
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-bottom: 12px; font-size: 14px; }
+.crumb { background: none; border: 0; color: var(--accent); font: inherit; padding: 4px 2px; cursor: pointer; }
+.crumb:hover { text-decoration: underline; }
+.pick-list { list-style: none; margin: 0 0 12px; padding: 0; max-height: 50vh; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+.pick-item { display: flex; align-items: center; gap: 8px; padding-right: 8px; border-bottom: 1px solid var(--border); }
+.pick-item:last-child { border-bottom: 0; }
+.pick-row { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; padding: 10px 12px; background: none; border: 0; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.pick-row:hover { background: var(--surface-2); }
+.pick-row.picked { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.pick-icon { color: var(--accent); width: 18px; text-align: center; }
+.pick-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-strong); }
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+.segmented button { background: none; border: 0; color: var(--ink-muted); font: inherit; padding: 8px 14px; cursor: pointer; }
+.segmented button.on { background: var(--accent-soft); color: var(--accent); }
+.share-url { display: flex; gap: 8px; align-items: center; margin: 8px auto 0; width: 100%; max-width: 520px; }
+.share-url input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); }

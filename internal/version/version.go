@@ -7,5 +7,5 @@ var (
 	// Commit is the git commit this build was made from.
 	Commit = "unknown"
 	// Milestone is the development milestone this build implements.
-	Milestone = 4
+	Milestone = 5
 )

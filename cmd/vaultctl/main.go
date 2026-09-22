@@ -56,8 +56,10 @@ Commands:
   remote status   Remote access status
   upload [--folder NAME] [--minutes N] [--terminal]
                   Upload to Vault (Phone -> Vault): shows a QR code for your phone
-  download        Download from Vault: Vault -> Phone   (Milestone 5)
-  share <file>    Create a share link                   (Milestone 5)
+  download [<file or folder>] [--minutes N] [--downloads N] [--terminal]
+                  Download from Vault (Vault -> Phone): pick a file, get a QR code
+  share <file or folder> [--expires 24h] [--downloads N] [--password]
+                  Read-only share link (unlimited downloads unless --downloads)
   shortcuts       Check Vault's shortcuts for conflicts
   shortcuts install [--use-suggestions] [--yes]
                   Add the free ones (never replaces an existing binding)
@@ -148,12 +150,9 @@ func realMain(args []string) int {
 	case "upload":
 		err = a.upload(ctx, cmdArgs)
 	case "download":
-		return notYet("Download from Vault (Vault -> Phone)", 5)
+		err = a.download(ctx, cmdArgs)
 	case "share":
-		if len(cmdArgs) == 0 {
-			return fail("usage: vaultctl share <file>")
-		}
-		return notYet("Share links", 5)
+		err = a.share(ctx, cmdArgs)
 	case "shortcuts":
 		err = a.shortcutsCmd(ctx, cmdArgs)
 	case "open":
@@ -178,11 +177,6 @@ func realMain(args []string) int {
 func fail(msg string) int {
 	fmt.Fprintln(os.Stderr, msg)
 	return 2
-}
-
-func notYet(feature string, milestone int) int {
-	fmt.Fprintf(os.Stderr, "%s arrives in Milestone %d. Nothing was changed.\n", feature, milestone)
-	return 3
 }
 
 func (a *app) baseURL() string {

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0c">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Download from Vault</title>
+<link rel="stylesheet" href="/t/transfer.css">
+</head>
+<body>
+<main id="app" data-expires="{{.Expires}}">
+  <header>
+    <div class="brand"><span class="mark">▣</span> VAULT</div>
+    <h1>DOWNLOAD FROM VAULT</h1>
+    <p class="sub">Vault → Phone</p>
+    <p class="muted small" id="expiry"></p>
+  </header>
+  <section class="item">
+    <span class="icon">{{if .IsDir}}▣{{else}}▤{{end}}</span>
+    <div>
+      <p class="item-name">{{.Name}}{{if .IsDir}}.zip{{end}}</p>
+      <p class="muted small">{{if .IsDir}}Folder · {{.Count}} file{{if ne .Count 1}}s{{end}} · {{end}}{{.Size}}</p>
+    </div>
+  </section>
+  <a class="primary" href="/d/{{.Token}}/file" download>Download</a>
+  {{if .LimitMsg}}<p class="muted small center">{{.LimitMsg}}</p>{{end}}
+  <p class="muted small center">Your phone saves it to Downloads{{if .IsDir}} as a .zip file{{end}}.</p>
+</main>
+<script src="/t/expiry.js"></script>
+</body>
+</html>

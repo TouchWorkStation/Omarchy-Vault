@@ -139,12 +139,25 @@ func (s *Server) Handler() http.Handler {
 	route("POST", "account/totp/enable", s.gate(user, s.handleTOTPEnable))
 	route("POST", "account/totp/disable", s.gate(user, s.handleTOTPDisable))
 	route("POST", "upload-session", s.gate(user, s.handleCreateUpload))
-	route("GET", "upload-sessions", s.gate(user, s.handleListUploads))
-	route("GET", "upload-session/{id}", s.gate(user, s.handleGetUpload))
-	route("DELETE", "upload-session/{id}", s.gate(user, s.handleStopUpload))
+	route("GET", "upload-sessions", s.gate(user, s.handleListLinks(transfer.KindUpload)))
+	route("GET", "upload-session/{id}", s.gate(user, s.handleGetLink(transfer.KindUpload)))
+	route("DELETE", "upload-session/{id}", s.gate(user, s.handleStopLink(transfer.KindUpload)))
+	route("GET", "browse", s.gate(user, s.handleBrowse))
+	route("POST", "download-session", s.gate(user, s.handleCreateDownload))
+	route("GET", "download-sessions", s.gate(user, s.handleListLinks(transfer.KindDownload)))
+	route("GET", "download-session/{id}", s.gate(user, s.handleGetLink(transfer.KindDownload)))
+	route("DELETE", "download-session/{id}", s.gate(user, s.handleStopLink(transfer.KindDownload)))
+	route("POST", "share", s.gate(user, s.handleCreateShare))
+	route("GET", "shares", s.gate(user, s.handleListLinks(transfer.KindShare)))
+	route("GET", "share/{id}", s.gate(user, s.handleGetLink(transfer.KindShare)))
+	route("DELETE", "share/{id}", s.gate(user, s.handleStopLink(transfer.KindShare)))
+	route("GET", "link/{id}", s.gate(user, s.handleGetLink("")))
+	route("DELETE", "link/{id}", s.gate(user, s.handleStopLink("")))
 	route("GET", "activity", s.gate(user, s.handleActivity))
 	// Beam (and other local tools) use the local token.
 	mux.HandleFunc("POST /api/v1/beam/upload-session", s.gate(admin, s.handleCreateUpload))
+	mux.HandleFunc("POST /api/v1/beam/download-session", s.gate(admin, s.handleCreateDownload))
+	mux.HandleFunc("POST /api/v1/beam/share", s.gate(admin, s.handleCreateShare))
 
 	// Admins only.
 	route("GET", "disks", s.gate(admin, s.handleDisks))
@@ -222,12 +235,7 @@ type plannedEndpoint struct {
 // planned lists API endpoints that exist in the design but are delivered by
 // later milestones.
 var planned = []plannedEndpoint{
-	{"POST", "download-session", "Download from Vault", 5},
-	{"POST", "share", "Share links", 5},
-	{"DELETE", "share/{id}", "Share links", 5},
 	{"POST", "remote", "Remote access", 6},
-	{"POST", "v1/beam/download-session", "Beam download sessions", 5},
-	{"POST", "v1/beam/share", "Beam shares", 5},
 }
 
 // StatusResponse is returned by GET /api/status.

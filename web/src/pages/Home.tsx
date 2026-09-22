@@ -31,18 +31,21 @@ function shortcutBadge(s: ShortcutBrief["status"]) {
 
 const actions = [
   { to: "/upload", icon: icons.upload, label: "Upload", sub: "Phone → Vault", m: 0 },
-  { to: "/download", icon: icons.download, label: "Download", sub: "Vault → Phone", m: 5 },
+  { to: "/download", icon: icons.download, label: "Download", sub: "Vault → Phone", m: 0 },
   { to: "/files", icon: icons.files, label: "Open Files", sub: "Browse your Vault", m: 0 },
 ];
 
 function RecentFiles() {
   const { data } = useApi<{ items: TransferItem[] }>("/api/activity", 30_000);
-  if (!data || data.items.length === 0) return <p className="muted">Files you send from your phone show up here.</p>;
+  if (!data || data.items.length === 0) return <p className="muted">Files sent between your phone and the Vault show up here.</p>;
   return (
     <ul className="received">
       {data.items.slice(0, 6).map((f, i) => (
         <li key={i}>
-          <span className="received-name">{f.name}</span>
+          <span className="received-name">
+            <span className="muted">{f.kind === "upload" ? "↓ " : "↑ "}</span>
+            {f.name}
+          </span>
           <span className="muted small">
             {f.folder} · {bytes(f.size)}
           </span>

@@ -157,12 +157,7 @@ func TestCrossSiteWritesRefused(t *testing.T) {
 func TestPlannedEndpointsAre501(t *testing.T) {
 	h := testServer(t)
 	cases := map[string]string{
-		"/api/download-session":         "POST",
-		"/api/share":                    "POST",
-		"/api/share/abc":                "DELETE",
-		"/api/remote":                   "POST",
-		"/api/v1/beam/download-session": "POST",
-		"/api/v1/beam/share":            "POST",
+		"/api/remote": "POST",
 	}
 	for p, m := range cases {
 		w := do(h, m, p, func(r *http.Request) { r.Header.Set("Origin", "http://127.0.0.1:8788") })

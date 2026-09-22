@@ -11,6 +11,7 @@ import { Users } from "./pages/Users";
 import { Account } from "./pages/Account";
 import { Upload } from "./pages/Upload";
 import { Transfer } from "./pages/Transfer";
+import { Download } from "./pages/Download";
 import { send, setSignedOutHandler, type Session } from "./api";
 import { useApi } from "./useApi";
 
@@ -85,16 +86,7 @@ function Page({ path }: { path: string }) {
     case "/upload":
       return <Upload />;
     case "/download":
-      return (
-        <Planned
-          title="DOWNLOAD FROM VAULT"
-          subtitle="Vault → Phone"
-          milestone={5}
-          combo="Super + Shift + D"
-          lead="Press the shortcut, pick a file or folder, scan the QR code, and it downloads straight to your phone."
-          points={["One file or a whole folder", "Link works once and expires after 10 minutes", "Your folder structure stays private"]}
-        />
-      );
+      return <Download />;
     case "/users":
       return <Users />;
     case "/remote":

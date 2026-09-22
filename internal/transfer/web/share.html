@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0c">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>{{.Name}} · Vault</title>
+<link rel="stylesheet" href="/t/transfer.css">
+</head>
+<body>
+<main id="app" data-expires="{{.Expires}}">
+  <header>
+    <div class="brand"><span class="mark">▣</span> VAULT</div>
+    <h1>SHARED WITH YOU</h1>
+    <p class="muted small" id="expiry"></p>
+  </header>
+  <section class="item">
+    <span class="icon">{{if .IsDir}}▣{{else}}▤{{end}}</span>
+    <div>
+      <p class="item-name">{{.Name}}</p>
+      <p class="muted small">{{if .IsDir}}Folder · {{.Count}} file{{if ne .Count 1}}s{{end}} · {{end}}{{.Size}}</p>
+    </div>
+  </section>
+  {{if .IsDir}}
+  <a class="primary" href="/s/{{.Token}}/zip" download>Download all (.zip)</a>
+  {{if .Files}}
+  <ul class="files">
+    {{range .Files}}<li><a href="/s/{{$.Token}}/file?p={{.Path}}" download><span>{{.Path}}</span><span class="muted">{{.Size}}</span></a></li>
+    {{end}}
+  </ul>
+  {{end}}
+  {{if .More}}<p class="muted small center">and {{.More}} more in the .zip</p>{{end}}
+  {{else}}
+  <a class="primary" href="/s/{{.Token}}/file" download>Download</a>
+  {{end}}
+  {{if .LimitMsg}}<p class="muted small center">{{.LimitMsg}}</p>{{end}}
+  <p class="muted small center">Read-only link. Nothing here can be changed or deleted.</p>
+</main>
+<script src="/t/expiry.js"></script>
+</body>
+</html>

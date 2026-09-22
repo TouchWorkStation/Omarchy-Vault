@@ -125,7 +125,20 @@ Link expires / Stop → listener closes
 
 `internal/transfer` holds the store (SQLite through the pure-Go `modernc.org/sqlite`, no cgo), the safe file writer, and the phone listener with its embedded pages (`internal/transfer/web`). The listener is a separate `http.Server` with its own tiny mux, so none of the dashboard's routes exist on it.
 
-Download sessions mirror this with scope = one resource, `max_downloads` (default 1). Folders are streamed as a zip built on the fly, with paths relative to the shared folder. Tokens are redacted from logs.
+Downloads and shares use the same store, listener and token rules:
+
+```
+Super+Shift+D → vaultctl download → opens /download (file picker over GET /api/browse)
+   → POST /api/download-session {path} → token scope = one file or folder, max_downloads (default 1)
+   → QR: http://<LAN IP>:8790/d/<token>
+Phone → GET /d/<token> (page) → GET /d/<token>/file
+   → file: http.ServeContent (Range, so phones can resume)   folder: zip streamed entry by entry (Store, no temp file)
+   → counted once per (link, phone address, file); recorded in activity
+POST /api/share {path, minutes, max_downloads, password} → /s/<token>
+   → optional password page → HttpOnly cookie grant scoped to /s/<token> → listing, per-file download, .zip
+```
+
+Resources are resolved by `transfer.Stat`, which walks the path inside `os.Root` with `lstat` and refuses symlinks at every step; `transfer.Walk` lists a folder the same way. Tokens are redacted from logs.
 
 ## Beam integration
 
@@ -135,7 +148,7 @@ Beam stays independent. When it wants persistent storage it can call:
 - `POST /api/v1/beam/download-session`
 - `POST /api/v1/beam/share`
 
-These return the same token/QR payloads as Vault's own flows. `beam/upload-session` works today with the local owner token (`~/.config/omarchy-vault/secrets/local-token`, 0600) sent in the `X-Vault-Token` header; per-client keys arrive with Milestone 5.
+These return the same token/QR payloads as Vault's own flows and work today with the local owner token (`~/.config/omarchy-vault/secrets/local-token`, 0600) sent in the `X-Vault-Token` header; per-client keys arrive with Milestone 7.
 
 ## Repository layout
 

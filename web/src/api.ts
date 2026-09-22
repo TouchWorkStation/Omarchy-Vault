@@ -329,8 +329,11 @@ export interface TransferItem {
 
 export interface LinkView {
   id: string;
-  kind: string;
+  kind: "upload" | "download" | "share";
   folder: string;
+  path?: string;
+  max_files: number;
+  has_password: boolean;
   created_by: string;
   client: string;
   created_at: string;
@@ -343,3 +346,20 @@ export interface LinkView {
   qr_svg?: string;
   received: TransferItem[];
 }
+
+export interface BrowseEntry {
+  name: string;
+  path: string;
+  dir: boolean;
+  size: number;
+  modified: string;
+}
+
+export interface BrowseResponse {
+  path: string;
+  entries: BrowseEntry[];
+  truncated: boolean;
+}
+
+// Links above this many downloads are unlimited.
+export const UNLIMITED = 2 ** 30;

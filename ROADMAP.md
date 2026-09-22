@@ -51,15 +51,20 @@ Vault is built in milestones. Each ends in a working, tested, committed state. N
 - Dashboard: Upload page, live QR page with countdown and received list, Recent files on Home
 - `vaultctl upload [--folder] [--minutes] [--terminal]`; Super+Shift+U
 - `vaultctl shortcuts install / remove`: installs only free shortcuts, after showing exactly what it writes
-- Beam: `POST /api/v1/beam/upload-session` (local owner token). Per-client API keys moved to Milestone 5
+- Beam: `POST /api/v1/beam/upload-session` (local owner token)
 
-## Milestone 5: Download from Vault
+## ✅ Milestone 5: Download from Vault
 
-- Lightweight file picker (`vaultctl download`)
-- `POST /api/download-session`, one resource, max downloads
-- Folder downloads as streamed zip
-- Mobile download page, QR code
-- Share links: `POST /api/share`, `DELETE /api/share/:id`, passwords, limits
+- File picker in the dashboard (`GET /api/browse`, only folders you can open; no symlinks, hidden or unfinished files); Super+Shift+D opens it
+- `vaultctl download [<file or folder>] [--minutes N] [--downloads N] [--terminal]`
+- `POST /api/download-session`: one file or folder, 10 minutes and 1 download by default (up to 60 min, 10 phones); a download counts once per phone, so resuming doesn't use it up
+- Folders download as a zip streamed on the fly (no temporary copy)
+- Mobile download page with no JavaScript needed to download
+- Share links: `POST /api/share`, `GET /api/shares`, `DELETE /api/share/{id}`; read only; 10 min to 30 days; one, limited or unlimited downloads; optional password (argon2id, lockout on guessing); shared folders list their files and download as .zip
+- `vaultctl share <file or folder> [--expires 24h] [--downloads N] [--password]`
+- Guests can download to their own phone but can't create share links
+- Beam: `POST /api/v1/beam/download-session`, `POST /api/v1/beam/share`
+- Deferred to Milestone 7: per-client API keys for local tools (Beam uses the local owner token, which only your user can read)
 
 ## Milestone 6: Remote access
 
@@ -68,6 +73,8 @@ Vault is built in milestones. Each ends in a working, tested, committed state. N
 - Host allowlist and client-IP handling for the tunnel; 2FA prompt
 
 ## Milestone 7: More drives, health, LAN
+
+- Per-client API keys for local tools such as Beam (moved from Milestone 4/5)
 
 - Combine drives with mergerfs (non-destructive), per-drive capacity and health
 - SMART via the privileged helper, background polling at gentle intervals, alerts

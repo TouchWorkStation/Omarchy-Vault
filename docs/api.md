@@ -227,9 +227,35 @@ The token is only inside `url`. Vault keeps the URL in memory so the QR can be s
 
 One link with its `state` (`active`, `expired`, `stopped`, `full`) and the files `received` so far (`[{ "name", "folder", "size", "at", "actor", "kind" }]`). `DELETE` stops the link immediately.
 
+### Download from Vault and share links
+
+#### `GET /api/browse?path=Photos/2024`
+
+One Vault folder for the picker: `{ "path", "entries": [{ "name", "path", "dir", "size", "modified" }], "truncated" }`. Without `path`, the top level (only folders you can open). Hidden files, symlinks and unfinished uploads are never listed.
+
+#### `POST /api/download-session` (signed in; any account with access to the folder)
+
+Body: `{ "path": "Photos/2024/beach.jpg", "minutes": 10, "max_downloads": 1, "client": "dashboard" }`. `path` is a file or folder inside the Vault (a folder downloads as `<name>.zip`). `minutes` 1–60 (default `preferences.download_expiry_minutes`), `max_downloads` 1–10 (default `preferences.download_max_count`). Returns the same link view as uploads, with `kind: "download"`, `path` and a `/d/<token>` URL.
+
+Errors: `404 not_found` (no such file, or not yours to read), `400 not_plain` (a symlink or special file), `400 too_many_files` (folder with more than 20 000 files), `409 storage_not_ready`, `503 no_network`.
+
+#### `POST /api/share` (admin, or family for folders they can open)
+
+Body: `{ "path": "Photos/2024", "minutes": 1440, "max_downloads": 0, "password": "" }`. `minutes` up to 43 200 (30 days, default 24 h); `max_downloads` 0 = unlimited until expiry; `password` optional (account password rules). Returns a link view with `kind: "share"`, `has_password` and a `/s/<token>` URL. The password and its hash are never returned.
+
+#### Listing and stopping
+
+| Method | Path | |
+|---|---|---|
+| GET | `/api/download-sessions` · `/api/shares` | `{ "links": [...], "listening" }`: active links (admins see all, others their own) |
+| GET · DELETE | `/api/download-session/{id}` · `/api/share/{id}` | One link; `DELETE` stops it |
+| GET · DELETE | `/api/link/{id}` | The same for a link of any kind (used by the QR window) |
+
+For downloads and shares `files`/`max_files` count downloads, and `received` lists what was downloaded. `max_files` of 2 147 483 647 means unlimited.
+
 #### `GET /api/activity`
 
-`{ "items": [ …up to 20 recently received files… ] }`. Admins see all, others their own.
+`{ "items": [ …up to 20 recent transfers, both directions (kind upload / download / share)… ] }`. Admins see all, others their own.
 
 ### Phone pages (port 8790, only while a link is active)
 
@@ -238,6 +264,12 @@ One link with its `state` (`active`, `expired`, `stopped`, `full`) and the files
 | GET | `/u/{token}` | Mobile upload page (or "This link has ended") |
 | GET | `/u/{token}/info` | `{ folder, expires_at (Unix ms), files_left }` |
 | POST | `/u/{token}/files` | `multipart/form-data`, one or more `file` parts; returns `{ "saved": [{name, size}], "folder" }` |
+| GET | `/d/{token}` | Mobile download page: name, size, Download button |
+| GET | `/d/{token}/file` | The file (Range supported) or the folder as `.zip` |
+| GET | `/s/{token}` | Share page (or its password form); folders list their files |
+| POST | `/s/{token}/unlock` | Form field `password`; sets an HttpOnly cookie scoped to this link, then redirects back |
+| GET | `/s/{token}/file[?p=sub/path]` | One file from the share |
+| GET | `/s/{token}/zip` | A shared folder as `.zip` |
 | GET | `/t/…` | Page assets |
 
 ### Power
@@ -257,18 +289,22 @@ Each returns `{ "error": "not_implemented", "message": "…", "milestone": N }`.
 
 ### Beam integration
 
-`POST /api/v1/beam/upload-session` is live (Milestone 4): same body and response as `POST /api/upload-session`, authenticated with the local owner token in `X-Vault-Token`. The others are reserved:
+Live, authenticated with the local owner token in `X-Vault-Token`, same bodies and responses as Vault's own endpoints:
 
-| Method | Path | Milestone |
+| Method | Path | Same as |
 |---|---|---|
-| POST | `/api/v1/beam/download-session` | 5 |
-| POST | `/api/v1/beam/share` | 5 |
+| POST | `/api/v1/beam/upload-session` | `POST /api/upload-session` |
+| POST | `/api/v1/beam/download-session` | `POST /api/download-session` |
+| POST | `/api/v1/beam/share` | `POST /api/share` |
 
-Planned response shape for sessions:
+Beam should send `"client": "beam"` so links show where they came from.
+
+The response shape, trimmed:
 
 ```json
-{ "id": "ses_…", "url": "https://vault.example.com/u/<token>", "qr_svg": "<svg…>",
-  "expires_at": "2026-09-22T19:40:00Z", "scope": "upload", "destination": "Phone Uploads" }
+{ "id": "QVFqlxMjFxB9kaNc", "kind": "download", "folder": "Photos", "path": "Photos/2024/beach.jpg",
+  "expires_at": "2026-09-22T19:40:00Z", "max_files": 1, "files": 0, "has_password": false,
+  "state": "active", "url": "http://192.168.1.20:8790/d/<token>", "qr_svg": "<svg…>", "received": [] }
 ```
 
-The token appears only in `url` and only once; Vault stores its hash. Destinations are Vault folder names, never filesystem paths.
+The token appears only in `url`; Vault stores its hash. Paths are Vault paths (`Photos/2024/beach.jpg`), never filesystem paths.

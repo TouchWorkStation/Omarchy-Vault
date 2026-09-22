@@ -123,23 +123,27 @@ Forbidden, permanently: `exec(command)`, `run_shell(command)`, arbitrary paths, 
 
 ## Token model (Milestones 4–5)
 
-Implemented for uploads in Milestone 4; download and share tokens follow the same rules in Milestone 5.
+Uploads since Milestone 4; downloads and share links since Milestone 5.
 
 - 32 bytes from `crypto/rand`, base64url in the URL. Only the SHA-256 hash is stored (SQLite). Lookup compares hashes in constant time.
 - Every token has one scope: upload into one folder, or download one file/folder, or view one share.
 - Upload tokens: upload-only, cannot list or read; default 10-minute expiry (at most 60); 1000 files and 100 GB per link; revocable with Stop. Only admins, and family members into folders they can write, can create one; guests cannot.
 - Wrong tokens count towards the same lockout as passwords (per phone IP, 1 → 15 minutes).
-- Download tokens: one resource; default 10 minutes and 1 download; configurable.
-- Share links: read-only always; expiry 10 min / 1 h / 24 h / custom; one / limited / unlimited downloads until expiry; optional password (argon2id); manual revoke.
+- Download tokens: one file or folder; default 10 minutes and 1 download (at most 60 minutes and 10 downloads); Stop at any time.
+- A download is counted once per phone (network address) and file, when the transfer starts. The same phone can resume or retry an interrupted download until the link expires without using it up; another phone cannot. Counting is by address because phones have no account; two phones behind one address (unusual on home Wi-Fi) count as one.
+- Share links: read only, always; 10 minutes to 30 days; one, limited or unlimited downloads until expiry; optional password; Stop at any time. Only admins, and family members for folders they can open, can create one; guests cannot.
+- Share passwords are stored as argon2id hashes and follow the account password rules. Wrong guesses count towards a per-address lockout (1 → 15 minutes). A correct password gives an HttpOnly, SameSite=Lax cookie scoped to that one link's path, valid for at most 12 hours and never longer than the link; grants live in memory only.
+- What a link can reach: exactly the file or folder it names, resolved inside the Vault through `os.Root`. Every path element is checked with `lstat` and a symlink anywhere is refused; files are opened with `O_NOFOLLOW`. Inside a shared folder, symlinks, special files and unfinished uploads are neither listed nor zipped, and a sub-path can never leave the folder (`..` is rejected).
+- Pages served to phones never contain filesystem paths, only names relative to what was shared.
 - URLs never contain filesystem paths. Filenames from phones are sanitised (no separators, no leading dots, no control characters, length-limited) and never overwrite existing files.
 - Token path segments (`/u/…`, `/d/…`, `/s/…`) are redacted in logs.
 
 ### The phone listener (Milestone 4)
 
-Phones can't reach the dashboard (it listens on 127.0.0.1 only). While at least one upload link is active, Vault opens a **second, separate** listener on your LAN address, port 8790. It serves only the upload page for a valid token (`/u/<token>`), its status, the upload itself, and static page assets. No dashboard, no API, no Files, no directory listing. It closes as soon as the last link expires or is stopped (checked every 30 seconds; an upload still arriving finishes first), and it never runs while Vault is off.
+Phones can't reach the dashboard (it listens on 127.0.0.1 only). While at least one link (upload, download or share) is active, Vault opens a **second, separate** listener on your LAN address, port 8790. It serves only pages for a valid token (`/u/<token>` upload, `/d/<token>` download, `/s/<token>` share) and static page assets. No dashboard, no API, no Files, and no browsing beyond what one link names. It closes as soon as the last link expires, is used up or is stopped (checked every 30 seconds; a transfer still in progress finishes first), and it never runs while Vault is off. Note that a share link keeps it open for as long as the share lasts (up to 30 days while Vault is on); stop shares you no longer need.
 
 - It binds to one address, never `0.0.0.0`: the private LAN address it detects, or the IP you set as `transfer.host` in config (loopback and `0.0.0.0` are refused). If no private network address is found, no link is created.
-- **Plain HTTP.** On your own Wi-Fi this is like any home device; someone on the same network who can capture traffic could see the token and the files. Don't use upload links on untrusted Wi-Fi (cafés, hotels). HTTPS arrives with remote access (Milestone 6).
+- **Plain HTTP.** On your own Wi-Fi this is like any home device; someone on the same network who can capture traffic could see the token and the files. Don't use transfer or share links on untrusted Wi-Fi (cafés, hotels). HTTPS arrives with remote access (Milestone 6).
 - Strict CSP (`default-src 'none'`, own scripts and styles only), `Referrer-Policy: no-referrer` (the token is in the URL), `no-store`, framing denied.
 - Files are streamed to a hidden `.vault-partial-*` file inside the destination folder and renamed into place with `RENAME_NOREPLACE`, so an existing file is never replaced; the folder is opened through `os.Root`, so a symlink can't redirect the write. Partial files are deleted on error.
 

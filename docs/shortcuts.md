@@ -44,7 +44,7 @@ vaultctl shortcuts install --use-suggestions  # a taken shortcut gets its free a
 vaultctl shortcuts install --yes              # no question (for scripts)
 ```
 
-It installs only shortcuts whose command exists already (Download arrives in Milestone 5; run install again then) and only those that are free. A taken one is skipped, never overwritten, unless you pass `--use-suggestions`, which uses the checked-free alternative (e.g. Super + Alt + U). Hyprland reloads its config by itself, so they work at once.
+It installs only shortcuts whose command exists already and only those that are free. If you installed them before Milestone 5, run it again to add Super + Shift + D. A taken one is skipped, never overwritten, unless you pass `--use-suggestions`, which uses the checked-free alternative (e.g. Super + Alt + U). Hyprland reloads its config by itself, so they work at once.
 
 What it writes:
 
@@ -71,4 +71,5 @@ Add to `~/.config/hypr/bindings.conf`:
 ```
 bindd = SUPER SHIFT, V, Open Vault, exec, vaultctl open
 bindd = SUPER SHIFT, U, Upload to Vault, exec, vaultctl upload
+bindd = SUPER SHIFT, D, Download from Vault, exec, vaultctl download
 ```
