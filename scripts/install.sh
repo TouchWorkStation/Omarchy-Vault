@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Omarchy Vault installer (Milestone 1).
+# Omarchy Vault installer.
 #
 # Every action is printed before it runs. Nothing here touches your drives:
 # no formatting, partitioning, mounting or fstab edits. Keybindings are only
@@ -105,8 +105,20 @@ run mkdir -p "$CONFIG_DIR"
 run chmod 700 "$CONFIG_DIR"
 note "Settings will live in $CONFIG_DIR/config.json (created during storage setup)."
 
-# 6. Vault storage root is handled by setup in Milestone 2.
-note "/srv/vault is not created yet — choosing storage arrives in Milestone 2."
+# 6. /srv/vault shortcut. It is a symlink to a user-owned link that Vault
+#    switches when you choose storage, so Vault never needs root afterwards.
+say "Vault location /srv/vault"
+LINK_TARGET="$DATA_DIR/current"
+if [[ -L /srv/vault && "$(readlink /srv/vault)" == "$LINK_TARGET" ]]; then
+  note "/srv/vault already points to Vault"
+elif [[ -e /srv/vault || -L /srv/vault ]]; then
+  warn "/srv/vault already exists and is not Vault's shortcut; leaving it alone."
+  note "Your Vault still works; it just won't be reachable at /srv/vault."
+elif ask "Create /srv/vault -> $LINK_TARGET (needs sudo once)?"; then
+  run sudo ln -sn -- "$LINK_TARGET" /srv/vault
+else
+  note "Skipped. Create it later with: vaultctl link"
+fi
 
 # 7. Binaries.
 say "Installing binaries to $BIN_DIR"
@@ -148,7 +160,8 @@ fi
 say "Done"
 cat <<MSG
 
-    Open Vault:        http://127.0.0.1:8788   (or: vaultctl open)
+    Set up storage:    vaultctl setup          (opens the setup screens)
+    Open Vault:        vaultctl open           (http://127.0.0.1:8788)
     Check everything:  vaultctl doctor
     See your drives:   vaultctl disks
 

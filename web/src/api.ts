@@ -73,16 +73,52 @@ export interface Inventory {
   scanned_at: string;
 }
 
+export type StorageState = "not_set_up" | "ready" | "drive_missing" | "drive_moved" | "problem";
+
+export interface SourceStatus {
+  label: string;
+  volume?: string;
+  path: string;
+  folder?: string;
+  data_dir: string;
+  state: StorageState;
+  current_mount?: string;
+  message?: string;
+  total_bytes: number;
+  used_bytes: number;
+  free_bytes: number;
+}
+
 export interface StorageStatus {
+  state: StorageState;
   configured: boolean;
   root: string;
-  root_exists: boolean;
+  root_link: { path: string; state: "ok" | "missing" | "elsewhere" | "not_link"; target?: string };
+  data_link: string;
   pool_mode: string;
-  sources: string[];
+  sources: SourceStatus[];
   total_bytes: number;
   used_bytes: number;
   free_bytes: number;
   message?: string;
+}
+
+export interface AdoptResult {
+  data_dir: string;
+  created: string[];
+  existing: string[];
+  skipped: string[];
+}
+
+export interface PoolResponse {
+  storage: StorageStatus;
+  result?: AdoptResult;
+  notes?: string[];
+}
+
+export interface Session {
+  can_change: boolean;
+  hint?: string;
 }
 
 export interface Candidate {
@@ -195,9 +231,27 @@ export class ApiError extends Error {
 }
 
 export async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return request<T>("GET", path, undefined, signal);
+}
+
+// Writes carry X-Vault-Request so a cross-site page can never forge them.
+export async function send<T>(method: "POST" | "DELETE", path: string, body?: unknown): Promise<T> {
+  return request<T>(method, path, body);
+}
+
+async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   let res: Response;
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (method !== "GET") headers["X-Vault-Request"] = "1";
+  if (body !== undefined) headers["Content-Type"] = "application/json";
   try {
-    res = await fetch(path, { signal, headers: { Accept: "application/json" }, credentials: "same-origin" });
+    res = await fetch(path, {
+      method,
+      signal,
+      headers,
+      credentials: "same-origin",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
   } catch (e) {
     if ((e as Error).name === "AbortError") throw e;
     throw new ApiError(0, "Vault service is not reachable.");

@@ -24,6 +24,13 @@ done
 [[ -d "$DATA_DIR/plugin" ]] && run rm -rf "$DATA_DIR/plugin"
 run systemctl --user daemon-reload || true
 
+# Remove /srv/vault only if it is Vault's own shortcut.
+if [[ -L /srv/vault && "$(readlink /srv/vault)" == "$DATA_DIR/current" ]]; then
+  echo "==> Removing the /srv/vault shortcut (needs sudo)"
+  run sudo rm -- /srv/vault
+fi
+[[ -L "$DATA_DIR/current" ]] && run rm -- "$DATA_DIR/current"
+
 echo
-echo "Kept: ${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-vault/ (settings) and all Vault storage."
+echo "Kept: ${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-vault/ (settings) and every file on your Vault drive."
 echo "Remove settings yourself if you no longer want them."

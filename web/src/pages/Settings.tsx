@@ -109,8 +109,10 @@ export function Settings() {
             <Loading what="settings" />
           ) : (
             <dl className="kv">
-              <dt>Vault folder</dt>
+              <dt>Vault</dt>
               <dd>{data.config.vault_root}</dd>
+              <dt>Stored on</dt>
+              <dd>{status?.storage.sources[0]?.data_dir ?? "not set up"}</dd>
               <dt>Phone uploads go to</dt>
               <dd>{data.config.preferences.upload_folder}</dd>
               <dt>Upload links expire</dt>

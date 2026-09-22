@@ -29,6 +29,8 @@ make check     # vet + tests + gofmt check + web typecheck/build
 
 ```sh
 ./bin/vaultctl disks         # works without the daemon
+./bin/vaultctl storage       # storage state + drives Vault can use
+./bin/vaultctl setup         # opens /setup signed in (needs the daemon)
 ./bin/vaultctl disks --json
 ./bin/vaultctl shortcuts
 ./bin/vaultctl doctor
@@ -42,6 +44,12 @@ VAULT_ADDR=http://127.0.0.1:9000 ./bin/vaultctl status
 - All command execution goes through `internal/sysexec` (allowlist, no shell, timeout, `LC_ALL=C`). Tests use `sysexec.Fake`.
 - API types in `web/src/api.ts` mirror the Go structs; update both together.
 - The dashboard uses no external fonts, scripts or images (CSP is `default-src 'self'`).
+
+## Demo mode
+
+`vaultd --demo` serves sample drives. The sample "WD Red" and USB stick are real folders in a throwaway sandbox under `~/.cache/omarchy-vault/demo-*`, so you can click through setup and it really creates folders. Your real config, token and `/srv/vault` are never touched, and the sandbox is deleted when vaultd exits. Capacity shown after setup is the capacity of the disk holding the sandbox.
+
+If your home directory is under a location Vault refuses as storage (for example `/root` in a container), point the sandbox elsewhere: `XDG_CACHE_HOME=/home/you/.cache ./bin/vaultd --demo`.
 
 ## Adding a fixture from a real machine
 

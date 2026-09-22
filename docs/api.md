@@ -6,11 +6,16 @@ Base URL: `http://127.0.0.1:8788`. Every endpoint is also available under `/api/
 { "error": "not_found", "message": "Unknown API endpoint." }
 ```
 
-Milestone 1 has no authentication because the service only listens on loopback and every endpoint is read-only. Authentication arrives in Milestone 3, before any write endpoint or remote access.
+Read-only endpoints need no authentication (loopback only). State-changing endpoints need either:
+
+- `X-Vault-Token: <contents of ~/.config/omarchy-vault/secrets/local-token>` (CLI, Beam), or
+- the `vault_session` cookie **and** `X-Vault-Request: 1` (browser; see "Signing in").
+
+Otherwise they return `401 login_required`. Full user accounts arrive in Milestone 3.
 
 Requests must carry a loopback `Host` (`127.0.0.1`, `localhost`, `::1`) or a configured domain, otherwise `421`. Non-GET requests from another origin are refused with `403`.
 
-## Available now (Milestone 1)
+## Available now
 
 ### `GET /api/status`
 
@@ -72,16 +77,67 @@ Drive inventory. Cached for 30 s; `refresh=1` forces a rescan at most every 5 s.
 `status` (volume): `system`, `mounted`, `unmounted`, `container`, `unsupported`, `swap`.
 `health.status`: `healthy`, `warning`, `critical`, `unknown` (with `reasons` or `message`).
 
-### `GET /api/storage`
+### `GET /api/storage[?refresh=1]`
 
-Vault root status plus `candidates`: mounted, supported volumes that could become Vault storage.
+Live Vault storage state plus `candidates`: mounted, supported volumes that could become Vault storage.
 
 ```json
-{ "configured": false, "root": "/srv/vault", "…": "…",
+{
+  "state": "ready",
+  "configured": true,
+  "root": "/srv/vault",
+  "root_link": { "path": "/srv/vault", "state": "ok", "target": "/home/me/.local/share/omarchy-vault/current" },
+  "data_link": "/home/me/.local/share/omarchy-vault/current",
+  "pool_mode": "single",
+  "sources": [ { "label": "WDC WD80EFZZ-68BTXN0", "volume": "sda1", "path": "/mnt/wdred", "folder": "Vault",
+                 "data_dir": "/mnt/wdred/Vault", "state": "ready",
+                 "total_bytes": 7875955240960, "used_bytes": 2599023255552, "free_bytes": 5276787884032 } ],
+  "total_bytes": 7875955240960, "used_bytes": 2599023255552, "free_bytes": 5276787884032,
   "candidates": [ { "disk": "sda", "display_name": "WDC WD80EFZZ-68BTXN0", "volume": "sda1",
                     "mountpoint": "/mnt/wdred", "fstype": "ext4",
-                    "size_bytes": 7875955240960, "free_bytes": 5276787884032, "health": "healthy" } ] }
+                    "size_bytes": 7875955240960, "free_bytes": 5276787884032, "health": "healthy" } ]
+}
 ```
+
+`state`: `not_set_up`, `ready`, `drive_missing` (unplugged or unmounted), `drive_moved` (`current_mount` says where), `problem` (with `message`).
+`root_link.state`: `ok`, `missing` (run `vaultctl link`), `elsewhere`, `not_link` (Vault leaves those alone).
+
+### `POST /api/pool` (auth)
+
+Use one mounted drive as the Vault.
+
+```json
+{ "volume": "sda1", "folder": "Vault", "create_folders": true, "replace": false }
+```
+
+- `volume`: a name from `GET /api/disks`. Vault never accepts a path; it resolves the mount point from its own fresh scan.
+- `folder`: omitted means `"Vault"`; `""` means the whole drive; up to four plain path components.
+- `create_folders`: default `true`. Creates Photos, Documents, Backups, Projects, Phone Uploads, Shared if missing.
+- `replace`: required when storage is already set up. Old files stay where they are.
+- `mode`: `"single"` (default). `"combined"` returns `501` until Milestone 7.
+
+Response: `{ "storage": <GET /api/storage without candidates>, "result": { "data_dir", "created": [], "existing": [], "skipped": [] }, "notes": [] }`.
+
+| Status | `error` | Meaning |
+|---|---|---|
+| 400 | `bad_request`, `unsafe_path` | malformed body, unknown field, bad folder, symlink or nested mount |
+| 401 | `login_required`, `bad_token` | not authorized |
+| 403 | `system_disk` | the volume is on the system disk |
+| 404 | `not_found` | no such volume now |
+| 409 | `not_adoptable`, `unknown_system_disk`, `already_set_up` | not usable, system disk unknown, or `replace` missing |
+
+### `DELETE /api/pool` (auth)
+
+Stop using the current storage. Config and the `current` link are cleared; **no file is touched**.
+
+### Signing in (local)
+
+| Method | Path | |
+|---|---|---|
+| POST | `/api/local-login` | with `X-Vault-Token`; returns `{ "path": "/login?code=…", "expires_in": 30 }` |
+| GET | `/login?code=…&next=/setup` | redeems the single-use code, sets `vault_session`, redirects to `next` (same-site paths only) |
+| GET | `/api/session` | `{ "can_change": true }` |
+| POST | `/api/logout` | needs `X-Vault-Request: 1` |
 
 ### `GET /api/settings`
 
@@ -117,7 +173,6 @@ Each returns `{ "error": "not_implemented", "message": "…", "milestone": N }`.
 
 | Method | Path | Milestone |
 |---|---|---|
-| POST | `/api/pool` | 2 |
 | GET, POST | `/api/users` | 3 |
 | POST | `/api/upload-session` | 4 |
 | POST | `/api/download-session` | 5 |

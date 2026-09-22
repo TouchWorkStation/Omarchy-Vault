@@ -22,16 +22,16 @@ It is **not** a replacement for TrueNAS, Unraid or ZimaOS. There is no separate 
 
 ## Status
 
-**Milestone 1 of 7 is complete.** This build is read-only: it discovers your drives, protects the system disk, shows health, and checks shortcut conflicts. It does not change anything on your machine yet. See [ROADMAP.md](ROADMAP.md).
+**Milestones 1 and 2 of 7 are complete.** Vault discovers your drives, protects the system disk, and lets you turn one mounted drive into your Vault through a six-step setup. See [ROADMAP.md](ROADMAP.md).
 
-| Works now (M1) | Coming |
+| Works now | Coming |
 |---|---|
-| Dashboard (desktop and phone) | Choosing drives for the Vault (M2) |
-| Read-only drive discovery (`lsblk`, `findmnt`) | File browser and users via SFTPGo (M3) |
-| SYSTEM / PROTECTED system-disk detection | **Upload to Vault**: Super+Shift+U, QR code (M4) |
-| SMART health: Healthy / Warning / Critical / Unknown | **Download from Vault**: Super+Shift+D, QR code (M5) |
-| Shortcut conflict detection (never installs) | Remote access through Cloudflare Tunnel (M6) |
-| `vaultctl` status, disks, storage, shortcuts, doctor | Combining several drives, LAN sharing (M7) |
+| First-run setup: choose a drive, create your Vault (M2) | File browser and users via SFTPGo (M3) |
+| Your Vault at `/srv/vault`, default folders created if missing (M2) | **Upload to Vault**: Super+Shift+U, QR code (M4) |
+| Unplugged or moved drives detected; nothing written to the system disk (M2) | **Download from Vault**: Super+Shift+D, QR code (M5) |
+| Dashboard (desktop and phone), drive discovery, SYSTEM · PROTECTED detection | Remote access through Cloudflare Tunnel (M6) |
+| SMART health: Healthy / Warning / Critical / Unknown | Combining several drives, LAN sharing (M7) |
+| Shortcut conflict detection (never installs) | Backups (M8) |
 
 ## Features (planned for v0.1)
 
@@ -57,9 +57,20 @@ cd Omarchy-Vault
 ./scripts/install.sh             # build, install for your user, start the service
 ```
 
-Then open http://127.0.0.1:8788, or run:
+Then set up your Vault:
 
 ```sh
+vaultctl setup                 # opens the setup screens in your browser
+# or, from the terminal:
+vaultctl storage               # drives Vault can use
+vaultctl storage use sda1      # use that drive (creates a Vault folder on it)
+vaultctl link                  # optional: also reach it at /srv/vault (sudo once)
+```
+
+Other useful commands:
+
+```sh
+vaultctl open        # open the dashboard, signed in
 vaultctl doctor      # check everything Vault needs
 vaultctl disks       # list drives; the system disk is marked SYSTEM · PROTECTED
 vaultctl shortcuts   # check Super+Shift+V/U/D for conflicts
@@ -90,7 +101,9 @@ One Go binary serves the API and the dashboard. SQLite (from Milestone 4) holds 
 
 - **Vault never formats, partitions, erases or rewrites partition tables.** It only uses filesystems that are already mounted.
 - **The system disk is always protected.** Any drive backing `/`, `/boot`, EFI, `/usr`, `/var`, `/home` or swap is marked SYSTEM · PROTECTED. If Vault cannot identify the system disk, it offers no drive at all.
-- **Local by default.** The service binds to `127.0.0.1` and rejects unknown `Host` headers (DNS-rebinding protection). Remote access is opt-in and goes through a tunnel.
+- **Unplugged drives can't fill your system disk.** Vault checks the drive's UUID and the kernel mount table before every use. If the drive is gone, the Vault shows as offline instead of writing into an empty folder.
+- **Adopting a drive only adds folders.** Existing files are never moved, renamed or deleted. "Stop using this drive" only forgets it.
+- **Local by default.** The service binds to `127.0.0.1` and rejects unknown `Host` headers (DNS-rebinding protection). Changes need a token that only your user can read. Remote access is opt-in and goes through a tunnel.
 - **No shell from the web.** There is no command-execution endpoint. Vault runs a short allowlist of read-only tools, without a shell.
 - **Shortcuts are never overwritten.** Conflicts are reported with options: choose another, copy the binding, or skip.
 
@@ -102,16 +115,20 @@ Beam and Vault are separate projects. Vault does not depend on Beam and does not
 
 ## Screenshots
 
+| Setup: choose a drive | Setup: create your Vault |
+|---|---|
+| ![Choose a drive](docs/screenshots/setup-storage.png) | ![Create your Vault](docs/screenshots/setup-vault.png) |
+
 | Storage | Phone |
 |---|---|
-| ![Storage page](docs/screenshots/storage.png) | ![Dashboard on a phone](docs/screenshots/dashboard-phone.png) |
+| ![Storage page](docs/screenshots/storage.png) | ![Ready on a phone](docs/screenshots/setup-ready-phone.png) |
 
 Screenshots use `--demo` data.
 
 ## Roadmap
 
 1. ✅ Foundation: dashboard, read-only drive discovery, shortcut planning
-2. Single-drive Vault, config, `/srv/vault`, system disk protection
+2. ✅ Single-drive Vault, config, `/srv/vault`, system disk protection
 3. SFTPGo files and users
 4. Upload to Vault (Super+Shift+U), QR, mobile upload page
 5. Download from Vault (Super+Shift+D), file picker, mobile download page

@@ -20,3 +20,4 @@ credentials*.json
 *.swp
 .idea/
 .vscode/
+.testmnt-*/

@@ -1,7 +1,8 @@
 // Command vaultctl is the Omarchy Vault command-line tool.
 //
 // Read-only commands (disks, storage, doctor, shortcuts) work without the
-// daemon. Nothing in Milestone 1 changes drives, mounts or Hyprland config.
+// daemon. Vault never formats, mounts or partitions drives, and never writes
+// Hyprland config.
 package main
 
 import (
@@ -33,7 +34,13 @@ Usage:
 Commands:
   status          Vault daemon status
   disks           List drives (SYSTEM drives are protected)
+  setup           Open the setup screens in your browser
   storage         Vault storage and drives that could be used
+  storage use <drive> [--folder NAME | --whole-drive] [--no-default-folders] [--yes]
+                  Use a mounted drive (e.g. sda1 or /mnt/wdred) as Vault storage
+  storage forget [--yes]
+                  Stop using the drive (files stay where they are)
+  link            Create the /srv/vault shortcut (asks for sudo once)
   pool status     How drives are combined
   users           Vault users                          (Milestone 3)
   remote status   Remote access status
@@ -98,7 +105,11 @@ func realMain(args []string) int {
 	case "disks":
 		err = a.disks(ctx)
 	case "storage":
-		err = a.storage(ctx)
+		err = a.storageCmd(ctx, cmdArgs)
+	case "setup":
+		err = a.openPage(ctx, "/setup")
+	case "link":
+		err = a.linkRoot(cmdArgs)
 	case "pool":
 		if len(cmdArgs) == 0 || cmdArgs[0] != "status" {
 			return fail("usage: vaultctl pool status")
@@ -123,7 +134,7 @@ func realMain(args []string) int {
 	case "shortcuts":
 		err = a.shortcuts(ctx)
 	case "open":
-		err = a.open()
+		err = a.openPage(ctx, "/")
 	case "doctor":
 		return a.doctor(ctx)
 	case "logs":
@@ -254,52 +265,16 @@ func (a *app) disks(ctx context.Context) error {
 	return nil
 }
 
-func (a *app) storage(ctx context.Context) error {
-	st := storage.Inspect(a.cfg)
-	inv, invErr := a.scanner().Inventory(ctx, false)
-	if a.json {
-		return a.emitJSON(map[string]any{"storage": st, "inventory": inv})
-	}
-	w := a.out
-	fmt.Fprintln(w, "VAULT STORAGE")
-	fmt.Fprintln(w)
-	row(w, "Vault root", st.Root)
-	if st.Configured {
-		row(w, "Total", humanBytes(st.TotalBytes))
-		row(w, "Used", humanBytes(st.UsedBytes))
-		row(w, "Available", humanBytes(st.FreeBytes))
-	} else {
-		row(w, "Status", st.Message)
-	}
-	if invErr != nil {
-		return invErr
-	}
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Drives Vault could use (choosing them arrives in Milestone 2):")
-	n := 0
-	for _, d := range inv.Disks {
-		for _, v := range d.Volumes {
-			if v.Adoptable {
-				n++
-				fmt.Fprintf(w, "  %-28s %-24s %s free of %s\n", d.DisplayName, v.Mountpoints[0], humanBytes(uint64(v.FSAvail)), humanBytes(uint64(v.FSSize)))
-			}
-		}
-	}
-	if n == 0 {
-		fmt.Fprintln(w, "  none — mount a drive (for example with your file manager) and check again")
-	}
-	return nil
-}
-
 func (a *app) poolStatus() error {
 	if a.json {
 		return a.emitJSON(map[string]any{"mode": a.cfg.Pool.Mode, "sources": a.cfg.Sources})
 	}
 	switch a.cfg.Pool.Mode {
 	case "none":
-		fmt.Fprintln(a.out, "No drives are in the Vault yet.")
+		fmt.Fprintln(a.out, "No drives are in the Vault yet. Run: vaultctl setup")
 	case "single":
-		fmt.Fprintf(a.out, "One drive: %s\n", a.cfg.Sources[0].Path)
+		src := a.cfg.Sources[0]
+		fmt.Fprintf(a.out, "One drive: %s (%s)\n", src.Label, src.DataDir())
 	case "combined":
 		fmt.Fprintf(a.out, "%d drives combined into one Vault:\n", len(a.cfg.Sources))
 		for _, s := range a.cfg.Sources {
@@ -330,18 +305,6 @@ func (a *app) shortcuts(ctx context.Context) error {
 	}
 	printShortcuts(a.out, rep)
 	return nil
-}
-
-func (a *app) open() error {
-	url := "http://" + a.cfg.Listen
-	if _, err := exec.LookPath("xdg-open"); err != nil {
-		fmt.Fprintln(a.out, url)
-		return nil
-	}
-	// Fixed program and a URL built from validated config only.
-	cmd := exec.Command("xdg-open", url)
-	cmd.Stdout, cmd.Stderr = nil, nil
-	return cmd.Start()
 }
 
 func logs(args []string) error {

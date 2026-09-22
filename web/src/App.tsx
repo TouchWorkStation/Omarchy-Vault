@@ -4,6 +4,7 @@ import { Home } from "./pages/Home";
 import { Storage } from "./pages/Storage";
 import { Settings } from "./pages/Settings";
 import { Planned } from "./pages/Planned";
+import { Setup } from "./pages/Setup";
 import type { Status } from "./api";
 import { useApi } from "./useApi";
 
@@ -65,6 +66,8 @@ function Page({ path }: { path: string }) {
       return <Storage />;
     case "/settings":
       return <Settings />;
+    case "/setup":
+      return <Setup />;
     case "/files":
       return (
         <Planned
@@ -158,6 +161,14 @@ export function App() {
         </p>
       </aside>
       <main className="main" aria-live="polite">
+        {new URLSearchParams(window.location.search).get("login") === "expired" && (
+          <div className="notice notice-warn login-expired" role="alert">
+            <span className="notice-glyph" aria-hidden="true">
+              !
+            </span>
+            <div>That sign-in link expired. Open Vault again with Super+Shift+V or vaultctl open.</div>
+          </div>
+        )}
         {status?.demo && (
           <div className="demo-banner" role="status">
             DEMO MODE · sample drives, not this computer's

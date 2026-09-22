@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/config"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
 )
@@ -40,7 +41,7 @@ func (a *app) doctor(ctx context.Context) int {
 	case a.cfgErr != nil:
 		add("config", lvFail, "%v", a.cfgErr)
 	case !a.found:
-		add("config", lvInfo, "no config yet at %s (created during setup in Milestone 2)", path)
+		add("config", lvInfo, "no config yet at %s (created when you choose storage: vaultctl setup)", path)
 	default:
 		add("config", lvOK, "%s is valid", path)
 		if info, err := os.Stat(path); err == nil && info.Mode().Perm()&0o022 != 0 {
@@ -76,15 +77,34 @@ func (a *app) doctor(ctx context.Context) int {
 		add("port", lvWarn, "Vault listens on a non-loopback address (%s); make sure that is intended", a.cfg.Listen)
 	}
 
-	// Storage path.
-	s := storage.Inspect(a.cfg)
-	switch {
-	case s.Configured && s.RootExists:
-		add("storage", lvOK, "%s: %s free of %s", s.Root, humanBytes(s.FreeBytes), humanBytes(s.TotalBytes))
-	case s.Configured:
-		add("storage", lvFail, "%s is configured but missing", s.Root)
+	// Storage.
+	inv, invErr := a.scanner().Inventory(ctx, true)
+	if invErr != nil {
+		inv = nil
+	}
+	s := a.localStorageStatus(inv)
+	switch s.State {
+	case storage.StateReady:
+		add("storage", lvOK, "%s: %s free of %s", s.Sources[0].DataDir, humanBytes(s.FreeBytes), humanBytes(s.TotalBytes))
+	case storage.StateNotSetUp:
+		add("storage", lvInfo, "Vault storage not set up yet; run: vaultctl setup")
 	default:
-		add("storage", lvInfo, "Vault storage not set up yet (Milestone 2)")
+		add("storage", lvFail, "%s", s.Message)
+	}
+	switch s.RootLink.State {
+	case "ok":
+		add("vault root", lvOK, "%s → %s", s.Root, s.DataLink)
+	case "missing":
+		add("vault root", lvInfo, "%s not created (optional); run: vaultctl link", s.Root)
+	default:
+		add("vault root", lvWarn, "%s exists but is not Vault's shortcut; Vault leaves it alone", s.Root)
+	}
+	if dir, err := config.Dir(); err == nil {
+		if _, err := auth.ReadToken(auth.SecretsDir(dir)); err != nil {
+			add("local token", lvWarn, "not found yet; it is created when the Vault service first starts")
+		} else {
+			add("local token", lvOK, "present and private (0600)")
+		}
 	}
 
 	// Required and optional tools.
@@ -116,8 +136,8 @@ func (a *app) doctor(ctx context.Context) int {
 	}
 
 	// Disk mounts and system disk protection.
-	if inv, err := a.scanner().Inventory(ctx, true); err != nil {
-		add("disks", lvFail, "drives could not be listed: %v", err)
+	if inv == nil {
+		add("disks", lvFail, "drives could not be listed: %v", invErr)
 	} else {
 		if inv.SystemDiskDetected {
 			add("system disk", lvOK, "identified and protected")

@@ -1,4 +1,5 @@
-import type { Disk, DiskStatus, Inventory, Volume } from "../api";
+import { ApiError, send, type Disk, type DiskStatus, type Inventory, type PoolResponse, type Session, type StorageStatus, type Volume } from "../api";
+import { Link } from "../App";
 import { icons } from "../components/Icons";
 import { Badge, Card, HealthBadge, Loading, Meter, Notice } from "../components/ui";
 import { bytes, hours } from "../format";
@@ -53,9 +54,9 @@ function VolumeRow({ v }: { v: Volume }) {
         <span className="muted">{v.fstype || "no filesystem"}</span>
         <span className="muted volume-mount">{mounted ? v.mountpoints.join(", ") : "not mounted"}</span>
         {v.adoptable && (
-          <Badge tone="accent" glyph="✓">
-            Usable
-          </Badge>
+          <Link to={`/setup?volume=${encodeURIComponent(v.name)}`} className="btn btn-small">
+            Use this drive
+          </Link>
         )}
       </div>
       {size > 0 && (
@@ -155,6 +156,119 @@ function DiskCard({ d }: { d: Disk }) {
   );
 }
 
+const stateLabel: Record<string, ReactElement> = {
+  ready: <Badge tone="good" glyph="●">Ready</Badge>,
+  drive_missing: <Badge tone="bad" glyph="✕">Offline</Badge>,
+  drive_moved: <Badge tone="warn" glyph="▲">Drive moved</Badge>,
+  problem: <Badge tone="bad" glyph="✕">Problem</Badge>,
+};
+
+function VaultStorageCard({ onChanged }: { onChanged: () => void }) {
+  const { data: st, reload } = useApi<StorageStatus>("/api/storage");
+  const { data: session } = useApi<Session>("/api/session");
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ tone: "info" | "bad"; text: string } | null>(null);
+  if (!st) return null;
+
+  if (!st.configured) {
+    return (
+      <>
+        {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
+        <Card className="setup-cta">
+          <div>
+            <h2>VAULT STORAGE</h2>
+            <p className="lead">Not set up yet. Choose a drive below or run the setup.</p>
+          </div>
+          <Link to="/setup" className="btn btn-primary">
+            Set up Vault
+          </Link>
+        </Card>
+      </>
+    );
+  }
+
+  const src = st.sources[0];
+  async function forget() {
+    setBusy(true);
+    try {
+      const r = await send<PoolResponse>("DELETE", "/api/pool");
+      setMsg({ tone: "info", text: r.notes?.join(" ") ?? "Vault no longer uses this drive." });
+      reload();
+      onChanged();
+    } catch (e) {
+      setMsg({ tone: "bad", text: e instanceof ApiError ? e.message : "Something went wrong." });
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <Card title="VAULT STORAGE" actions={stateLabel[st.state]}>
+      <div className="vault-storage">
+        <div>
+          <div className="stat-value">{src.label}</div>
+          <p className="muted small mono">{src.data_dir}</p>
+        </div>
+        {st.state === "ready" && (
+          <div className="vault-usage">
+            <Meter used={st.used_bytes} total={st.total_bytes} label="Vault storage used" />
+            <span className="muted small">
+              {bytes(st.used_bytes)} used · {bytes(st.free_bytes)} available · {bytes(st.total_bytes)} total
+            </span>
+          </div>
+        )}
+      </div>
+      {st.state !== "ready" && st.message && <Notice tone="warn">{st.message}</Notice>}
+      {st.state === "drive_moved" && src.volume && (
+        <p>
+          <Link to={`/setup?volume=${encodeURIComponent(src.volume)}`} className="btn btn-small">
+            Use it at its new location
+          </Link>
+        </p>
+      )}
+      <p className="muted small">
+        {st.root_link.state === "ok" ? (
+          <>
+            Also at <code>{st.root}</code>
+          </>
+        ) : st.root_link.state === "missing" ? (
+          <>
+            Optional: run <code>vaultctl link</code> to also reach it at <code>{st.root}</code>.
+          </>
+        ) : (
+          <>
+            <code>{st.root}</code> already exists and is not Vault's; Vault leaves it alone.
+          </>
+        )}
+      </p>
+      {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
+      {session?.can_change &&
+        (confirming ? (
+          <div className="confirm-row">
+            <span>Stop using this drive? Every file stays where it is.</span>
+            <button className="btn btn-small" onClick={() => setConfirming(false)} disabled={busy}>
+              Cancel
+            </button>
+            <button className="btn btn-small btn-danger" onClick={forget} disabled={busy}>
+              Stop using
+            </button>
+          </div>
+        ) : (
+          <div className="confirm-row">
+            <Link to="/setup" className="btn btn-small">
+              Change drive
+            </Link>
+            <button className="btn btn-small" onClick={() => setConfirming(true)}>
+              Stop using this drive
+            </button>
+          </div>
+        ))}
+    </Card>
+  );
+}
+
 export function Storage() {
   const [refresh, setRefresh] = useState(0);
   const { data, error, loading } = useApi<Inventory>(`/api/disks${refresh ? `?refresh=1&n=${refresh}` : ""}`);
@@ -181,6 +295,7 @@ export function Storage() {
               {w}
             </Notice>
           ))}
+          <VaultStorageCard onChanged={() => setRefresh((n) => n + 1)} />
           <p className="summary-line">
             {data.summary.total} drives · {data.summary.system} protected · {data.summary.available} available ·{" "}
             {data.summary.unmounted} not mounted · {data.summary.unsupported} unsupported
@@ -192,7 +307,6 @@ export function Storage() {
           </div>
           <Notice>
             Vault only uses drives that are already mounted. It never formats, partitions or erases anything.
-            Choosing drives for your Vault arrives in Milestone 2.
           </Notice>
         </>
       )}

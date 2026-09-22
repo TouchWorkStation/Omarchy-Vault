@@ -1,8 +1,9 @@
 // Package api serves Vault's local HTTP API and web UI.
 //
-// Milestone 1 exposes read-only endpoints only. Endpoints planned for later
-// milestones are registered and answer 501 with the milestone that delivers
-// them, so clients such as Beam can discover the API shape today.
+// Read endpoints are open on loopback; writes go through requireAuth.
+// Endpoints planned for later milestones are registered and answer 501 with
+// the milestone that delivers them, so clients such as Beam can discover the
+// API shape today.
 package api
 
 import (
@@ -15,8 +16,10 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/config"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/disks"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/services"
@@ -28,12 +31,21 @@ import (
 
 // Server holds the dependencies of the HTTP API.
 type Server struct {
+	// Config is the configuration at startup. Handlers read the live copy
+	// through s.config(); storage changes update it and ConfigPath.
 	Config      config.Config
+	ConfigPath  string
 	ConfigFound bool
 	ConfigErr   error
-	Disks       *disks.Scanner
-	Run         sysexec.Runner
-	Shortcuts   shortcuts.Inspector
+	// DataLink is ~/.local/share/omarchy-vault/current (see storage.SetLink).
+	DataLink string
+	// Mounts reads the kernel mount table; storage.ReadMountTable by default.
+	Mounts func() (storage.MountTable, error)
+	// Auth guards state-changing endpoints. Nil disables all writes.
+	Auth      *auth.Local
+	Disks     *disks.Scanner
+	Run       sysexec.Runner
+	Shortcuts shortcuts.Inspector
 	// Static is the built web UI. When nil or empty a placeholder page is
 	// served instead.
 	Static fs.FS
@@ -41,6 +53,42 @@ type Server struct {
 	Demo    bool
 	Log     *slog.Logger
 	Started time.Time
+
+	mu  sync.RWMutex
+	cur config.Config
+	// writeMu serialises storage changes.
+	writeMu sync.Mutex
+}
+
+func (s *Server) config() config.Config {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.cur
+}
+
+func (s *Server) setConfig(c config.Config) {
+	s.mu.Lock()
+	s.cur = c
+	s.ConfigFound = true
+	s.ConfigErr = nil
+	s.mu.Unlock()
+}
+
+func (s *Server) mounts() storage.MountTable {
+	read := s.Mounts
+	if read == nil {
+		read = storage.ReadMountTable
+	}
+	m, err := read()
+	if err != nil {
+		s.Log.Warn("mount table unreadable", "err", err)
+	}
+	return m
+}
+
+// storageStatus combines config, the drive inventory and the mount table.
+func (s *Server) storageStatus(ctx context.Context, inv *disks.Inventory) storage.Status {
+	return storage.Inspect(s.config(), inv, s.mounts(), s.DataLink)
 }
 
 // Handler returns the full middleware-wrapped handler.
@@ -51,6 +99,7 @@ func (s *Server) Handler() http.Handler {
 	if s.Started.IsZero() {
 		s.Started = time.Now()
 	}
+	s.cur = s.Config
 	mux := http.NewServeMux()
 
 	known := map[string]bool{}
@@ -66,6 +115,16 @@ func (s *Server) Handler() http.Handler {
 	get("shortcuts", s.handleShortcuts)
 	get("services", s.handleServices)
 	get("remote", s.handleRemote)
+	get("session", s.handleSession)
+
+	// State-changing endpoints: local token or session required.
+	mux.Handle("POST /api/pool", s.requireAuth(http.HandlerFunc(s.handleAdopt)))
+	mux.Handle("POST /api/v1/pool", s.requireAuth(http.HandlerFunc(s.handleAdopt)))
+	mux.Handle("DELETE /api/pool", s.requireAuth(http.HandlerFunc(s.handleForget)))
+	mux.Handle("DELETE /api/v1/pool", s.requireAuth(http.HandlerFunc(s.handleForget)))
+	mux.HandleFunc("POST /api/local-login", s.handleLocalLogin)
+	mux.HandleFunc("POST /api/logout", s.handleLogout)
+	mux.HandleFunc("GET /login", s.handleLogin)
 
 	for _, p := range planned {
 		p := p
@@ -115,7 +174,6 @@ type plannedEndpoint struct {
 // planned lists API endpoints that exist in the design but are delivered by
 // later milestones.
 var planned = []plannedEndpoint{
-	{"POST", "pool", "Using drives as Vault storage", 2},
 	{"GET", "users", "User management", 3},
 	{"POST", "users", "User management", 3},
 	{"POST", "upload-session", "Upload to Vault", 4},
@@ -177,7 +235,11 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	host, _ := os.Hostname()
-	st := storage.Inspect(s.Config)
+	inv, invErr := s.Disks.Inventory(ctx, false)
+	if invErr != nil {
+		inv = nil
+	}
+	st := s.storageStatus(ctx, inv)
 	resp := StatusResponse{
 		Name:          "Omarchy Vault",
 		Demo:          s.Demo,
@@ -185,19 +247,25 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Milestone:     version.Milestone,
 		Hostname:      host,
 		UptimeSeconds: int64(time.Since(s.Started).Seconds()),
-		Listen:        s.Config.Listen,
+		Listen:        s.config().Listen,
 		SetupComplete: st.Configured,
 		Storage:       st,
 		Remote:        s.remoteStatus(),
 		Users:         UsersStatus{Milestone: 3},
 		Services:      services.MarkSelfRunning(services.Check(ctx, s.Run)),
 	}
-	if s.ConfigErr != nil {
+	s.mu.RLock()
+	cfgErr := s.ConfigErr
+	s.mu.RUnlock()
+	if cfgErr != nil {
 		resp.Warnings = append(resp.Warnings, "Your Vault settings file has a problem, so defaults are in use. Run `vaultctl doctor` for details.")
 	}
-	if inv, err := s.Disks.Inventory(ctx, false); err != nil {
+	if st.Configured && st.State != storage.StateReady && st.Message != "" {
+		resp.Warnings = append(resp.Warnings, st.Message)
+	}
+	if invErr != nil {
 		resp.DrivesError = "Drives could not be listed."
-		s.Log.Warn("disk inventory failed", "err", err)
+		s.Log.Warn("disk inventory failed", "err", invErr)
 	} else {
 		sum := inv.Summary
 		resp.Drives = &sum
@@ -241,8 +309,12 @@ type Candidate struct {
 }
 
 func (s *Server) handleStorage(w http.ResponseWriter, r *http.Request) {
-	resp := StorageResponse{Status: storage.Inspect(s.Config), Candidates: []Candidate{}}
-	if inv, err := s.Disks.Inventory(r.Context(), false); err == nil {
+	inv, err := s.Disks.Inventory(r.Context(), r.URL.Query().Get("refresh") == "1")
+	if err != nil {
+		inv = nil
+	}
+	resp := StorageResponse{Status: s.storageStatus(r.Context(), inv), Candidates: []Candidate{}}
+	if inv != nil {
 		for _, d := range inv.Disks {
 			for _, v := range d.Volumes {
 				if !v.Adoptable || len(v.Mountpoints) == 0 {
@@ -269,10 +341,12 @@ type SettingsResponse struct {
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {
-	resp := SettingsResponse{Config: s.Config, ConfigFound: s.ConfigFound, ReadOnly: true}
+	s.mu.RLock()
+	resp := SettingsResponse{Config: s.cur, ConfigFound: s.ConfigFound, ReadOnly: true}
 	if s.ConfigErr != nil {
 		resp.ConfigError = s.ConfigErr.Error()
 	}
+	s.mu.RUnlock()
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -285,7 +359,8 @@ func (s *Server) handleServices(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) remoteStatus() RemoteStatus {
-	rs := RemoteStatus{Enabled: s.Config.Remote.Enabled, Provider: s.Config.Remote.Provider, Domain: s.Config.Remote.Domain, Milestone: 6}
+	c := s.config()
+	rs := RemoteStatus{Enabled: c.Remote.Enabled, Provider: c.Remote.Provider, Domain: c.Remote.Domain, Milestone: 6}
 	if rs.Enabled {
 		rs.State = "unknown"
 	} else {

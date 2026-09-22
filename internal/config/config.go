@@ -1,8 +1,7 @@
 // Package config loads and validates Vault's persistent configuration.
 //
-// Configuration lives at ~/.config/omarchy-vault/config.json. In Milestone 1
-// Vault only reads it; adoption of storage (Milestone 2) is the first feature
-// that writes it.
+// Configuration lives at ~/.config/omarchy-vault/config.json (mode 0600, in
+// a 0700 directory). It never holds secrets; those live in secrets/.
 package config
 
 import (
@@ -40,12 +39,27 @@ type Config struct {
 
 // Source is a storage location adopted into the Vault.
 type Source struct {
-	// Path is the existing mount point or directory being used.
+	// Path is the mount point of the drive's filesystem.
 	Path string `json:"path"`
-	// UUID is the filesystem UUID, used to detect a drive being swapped.
+	// Folder is the Vault's folder on that drive, relative to Path.
+	// Empty means the whole drive.
+	Folder string `json:"folder,omitempty"`
+	// UUID is the filesystem UUID, used to detect a missing or swapped drive.
 	UUID string `json:"uuid,omitempty"`
-	// Label is a human friendly name, e.g. "WD Red 8 TB".
+	// Volume is the device name at adoption time (e.g. "sda1"), for display.
+	Volume string `json:"volume,omitempty"`
+	// Label is a human friendly name, e.g. "WDC WD80EFZZ".
 	Label string `json:"label,omitempty"`
+	// AddedAt records when the source was adopted (RFC 3339).
+	AddedAt string `json:"added_at,omitempty"`
+}
+
+// DataDir is the absolute folder holding the Vault's files on this source.
+func (s Source) DataDir() string {
+	if s.Folder == "" {
+		return s.Path
+	}
+	return filepath.Join(s.Path, s.Folder)
 }
 
 // Pool describes how Sources are combined.
@@ -165,9 +179,23 @@ func (c Config) Validate() error {
 		if err := validateAbsClean(fmt.Sprintf("sources[%d].path", i), s.Path); err != nil {
 			errs = append(errs, err)
 		}
+		if err := ValidateFolder(s.Folder); err != nil {
+			errs = append(errs, fmt.Errorf("sources[%d].folder: %w", i, err))
+		}
 	}
 	switch c.Pool.Mode {
-	case "none", "single", "combined":
+	case "none":
+		if len(c.Sources) != 0 {
+			errs = append(errs, errors.New("pool.mode none must have no sources"))
+		}
+	case "single":
+		if len(c.Sources) != 1 {
+			errs = append(errs, errors.New("pool.mode single needs exactly one source"))
+		}
+	case "combined":
+		if len(c.Sources) < 2 {
+			errs = append(errs, errors.New("pool.mode combined needs at least two sources"))
+		}
 	default:
 		errs = append(errs, fmt.Errorf("pool.mode %q is not one of none, single, combined", c.Pool.Mode))
 	}
@@ -209,6 +237,79 @@ func ValidateListen(addr string, allowNonLoopback bool) error {
 	ip := net.ParseIP(host)
 	if ip == nil || !ip.IsLoopback() {
 		return fmt.Errorf("listen %q is not a loopback address; set security.allow_non_loopback_listen to override", addr)
+	}
+	return nil
+}
+
+// ValidateFolder checks a Vault folder name relative to a drive: empty (the
+// whole drive) or up to four plain path components, no "..", no hidden
+// tricks.
+func ValidateFolder(f string) error {
+	if f == "" {
+		return nil
+	}
+	if strings.ContainsAny(f, "\x00\\") || strings.HasPrefix(f, "/") || strings.HasSuffix(f, "/") {
+		return fmt.Errorf("folder %q must be a relative name like \"Vault\"", f)
+	}
+	parts := strings.Split(f, "/")
+	if len(parts) > 4 {
+		return fmt.Errorf("folder %q is nested too deeply", f)
+	}
+	for _, p := range parts {
+		if p == "" || p == "." || p == ".." || len(p) > 255 {
+			return fmt.Errorf("folder %q is not a valid folder name", f)
+		}
+		for _, r := range p {
+			if r < 0x20 || r == 0x7f {
+				return fmt.Errorf("folder %q contains control characters", f)
+			}
+		}
+	}
+	return nil
+}
+
+// Save writes cfg to path atomically: a 0600 temporary file in the same
+// 0700 directory, fsynced, then renamed over the old file.
+func Save(path string, cfg Config) error {
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("config: create %s: %w", dir, err)
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	tmp, err := os.CreateTemp(dir, ".config-*.json")
+	if err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName) // no-op after a successful rename
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return fmt.Errorf("config: write: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("config: replace %s: %w", path, err)
+	}
+	if d, err := os.Open(dir); err == nil {
+		_ = d.Sync()
+		d.Close()
 	}
 	return nil
 }

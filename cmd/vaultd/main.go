@@ -17,10 +17,12 @@ import (
 	"time"
 
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/api"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/config"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/demo"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/disks"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/shortcuts"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/sysexec"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/version"
 	"github.com/TouchWorkStation/Omarchy-Vault/web"
@@ -70,18 +72,41 @@ func run() error {
 	var run sysexec.Runner = sysexec.System{Timeout: 15 * time.Second}
 	home, _ := os.UserHomeDir()
 	hyprConf := filepath.Join(home, ".config", "hypr", "hyprland.conf")
+	cfgPathLive := *cfgPath
+	dataLink, err := storage.DefaultLinkPath()
+	if err != nil {
+		return err
+	}
+	var mounts func() (storage.MountTable, error)
+	secretsDir := auth.SecretsDir(filepath.Dir(*cfgPath))
+
 	if *demoMode {
-		log.Warn("DEMO MODE: showing sample drives, not this machine's")
-		run = demo.Runner()
-		dir, err := os.MkdirTemp("", "vault-demo-")
+		// Demo mode never touches this machine's config, drives or links:
+		// everything lives in a throwaway sandbox.
+		log.Warn("DEMO MODE: sample drives in a temporary sandbox, not this machine's")
+		sb, err := demo.NewSandbox()
 		if err != nil {
 			return err
 		}
-		defer os.RemoveAll(dir)
-		if hyprConf, err = demo.HyprConfig(dir); err != nil {
+		defer os.RemoveAll(sb.Dir)
+		run = demo.Runner(sb)
+		cfgPathLive, dataLink = sb.ConfigPath, sb.DataLink
+		secretsDir = auth.SecretsDir(filepath.Dir(sb.ConfigPath))
+		listenAddr := cfg.Listen
+		cfg, found, cfgErr = config.Default(), false, nil
+		cfg.Listen = listenAddr
+		sbMounts := storage.MountTable(sb.Mounts)
+		mounts = func() (storage.MountTable, error) { return sbMounts, nil }
+		if hyprConf, err = demo.HyprConfig(sb.Dir); err != nil {
 			return err
 		}
 	}
+
+	token, err := auth.LoadOrCreateToken(secretsDir)
+	if err != nil {
+		return fmt.Errorf("local token: %w", err)
+	}
+
 	static, built := web.Dist()
 	if !built {
 		log.Warn("web UI not built into this binary; run `make web && make build`")
@@ -90,8 +115,12 @@ func run() error {
 
 	srv := &api.Server{
 		Config:      cfg,
+		ConfigPath:  cfgPathLive,
 		ConfigFound: found,
 		ConfigErr:   cfgErr,
+		DataLink:    dataLink,
+		Mounts:      mounts,
+		Auth:        auth.NewLocal(token),
 		Disks:       &disks.Scanner{Run: run, SMART: !*noSMART},
 		Run:         run,
 		Shortcuts: shortcuts.Inspector{

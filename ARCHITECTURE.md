@@ -18,7 +18,8 @@ Omarchy Vault is one small Go daemon (`vaultd`), a CLI (`vaultctl`), a React das
 │                      CSRF origin checks, rate limit, SPA            │
 │  internal/disks      lsblk + findmnt → inventory, system disk       │
 │  internal/health     smartctl JSON → Healthy/Warning/Critical       │
-│  internal/storage    Vault root capacity                            │
+│  internal/storage    adoption, live state, /srv/vault link          │
+│  internal/auth       local token, login codes, sessions             │
 │  internal/services   which tools/units exist (read-only)            │
 │  internal/shortcuts  Hyprland binding conflict analysis             │
 │  internal/config     ~/.config/omarchy-vault/config.json            │
@@ -29,7 +30,7 @@ Omarchy Vault is one small Go daemon (`vaultd`), a CLI (`vaultctl`), a React das
         ▼                             ▼
   lsblk · findmnt · smartctl     SFTPGo (files, users, WebDAV, SFTP)   M3
   hyprctl · systemctl is-active  SQLite (tokens, shares, activity)     M4
-                                 vault-helper (privileged, allowlist)  M2/M7
+                                 vault-helper (privileged, allowlist)  M7
                                  mergerfs · cloudflared · samba        M6/M7
 ```
 
@@ -51,18 +52,31 @@ Omarchy Vault is one small Go daemon (`vaultd`), a CLI (`vaultctl`), a React das
 6. Volumes are classified: mounted and supported (adoptable), unmounted, container (LUKS/LVM/RAID), unsupported, swap. Mounts under reserved paths (`/var`, `/usr`, `/etc`, …) are never adoptable.
 7. SMART is queried with `smartctl -j -n standby -i -H -A /dev/X` (read-only, does not wake sleeping disks), cached for 30 minutes per drive.
 
-## Storage layout (from Milestone 2)
+## Storage layout (Milestone 2)
 
 ```
-/srv/vault/                 logical Vault root (single drive: bind or symlink; several: mergerfs)
-  Photos/  Documents/  Backups/<hostname>/  Projects/  Phone Uploads/  Shared/
+/srv/vault ──► ~/.local/share/omarchy-vault/current ──► /mnt/wdred/Vault
+ (root-owned symlink,        (user-owned symlink,          (folder on the
+  created once, asks)         switched atomically by vaultd)  adopted drive)
+
+/mnt/wdred/Vault/
+  Photos/  Documents/  Backups/  Projects/  Phone Uploads/  Shared/   (created only if missing)
+
 ~/.config/omarchy-vault/
-  config.json               0600, no secrets
-  secrets/                  0700; tunnel token, SFTPGo admin credentials (0600 each)
-  vault.db                  SQLite: tokens (hashed), shares, activity, trusted devices
+  config.json               0600, no secrets; sources[] = {path, folder, uuid, volume, label}
+  secrets/                  0700
+    local-token             0600, CLI write authorization
+  vault.db                  SQLite from Milestone 4: tokens (hashed), shares, activity
 ```
 
-Default folders are created only if missing; existing folders are never overwritten.
+Default folders are created only if missing; existing files and folders are never overwritten. In Milestone 7, combining drives mounts a mergerfs pool (FUSE, as the user) and points `current` at it; `/srv/vault` does not change.
+
+## Data flow: choosing storage (Milestone 2)
+
+1. The setup screen or `vaultctl storage use` sends `POST /api/pool {volume: "sda1", folder: "Vault"}`. Browsers use the session cookie plus `X-Vault-Request`; the CLI uses `X-Vault-Token`.
+2. vaultd forces a fresh drive scan and runs `storage.Adopt`. It refuses the system disk, unknown system disk, unadoptable volumes, unmounted mount points, symlinks and nested mounts. It creates only missing folders, through `os.Root`.
+3. `config.Save` writes atomically. vaultd then points `current` at the new folder.
+4. `GET /api/storage` recomputes state every time: the UUID must still be present, the mount point must be a kernel mount, and the folder must be on that filesystem. The result is ready / drive_missing / drive_moved / problem.
 
 ## API
 

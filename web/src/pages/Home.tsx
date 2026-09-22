@@ -69,20 +69,24 @@ export function Home() {
       ))}
 
       {!s.setup_complete && (
-        <Notice>
-          Vault storage isn't set up yet.{" "}
-          {s.drives && s.drives.available > 0 ? (
-            <>
-              {s.drives.available} drive{s.drives.available === 1 ? " is" : "s are"} ready to use.{" "}
-            </>
-          ) : null}
-          <Link to="/storage">See your drives</Link>. Choosing storage arrives in Milestone 2.
-        </Notice>
+        <Card className="setup-cta">
+          <div>
+            <h2>SET UP YOUR VAULT</h2>
+            <p className="lead">
+              {s.drives && s.drives.available > 0
+                ? `${s.drives.available} drive${s.drives.available === 1 ? " is" : "s are"} ready to use.`
+                : "Mount a drive to get started."}
+            </p>
+          </div>
+          <Link to="/setup" className="btn btn-primary">
+            Get Started
+          </Link>
+        </Card>
       )}
 
       <div className="tiles">
         <div className="tile">
-          {st.configured ? (
+          {st.state === "ready" ? (
             <>
               <Stat
                 label="Storage"
@@ -91,6 +95,8 @@ export function Home() {
               />
               <Meter used={st.used_bytes} total={st.total_bytes} label="Vault storage used" />
             </>
+          ) : st.configured ? (
+            <Stat label="Storage" value={st.state === "drive_moved" ? "Drive moved" : st.state === "drive_missing" ? "Offline" : "Problem"} sub={st.sources[0]?.label} />
           ) : (
             <Stat label="Storage" value="Not set up" sub={st.root} />
           )}

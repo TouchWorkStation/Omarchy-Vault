@@ -728,3 +728,210 @@ kbd {
   font-size: 12px;
   letter-spacing: 0.08em;
 }
+
+/* ---------- Milestone 2: setup & storage controls ---------- */
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.btn-primary:hover:not(:disabled) {
+  background: #9fcb90;
+  text-decoration: none;
+}
+.btn-primary svg {
+  color: var(--accent-ink);
+}
+a.btn:hover {
+  text-decoration: none;
+}
+.btn-danger {
+  border-color: rgba(224, 122, 112, 0.6);
+  color: var(--bad);
+}
+.btn-danger:hover:not(:disabled) {
+  border-color: var(--bad);
+}
+
+.setup {
+  max-width: 720px;
+}
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.progress-dot {
+  width: 24px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+.progress-dot.done {
+  background: var(--accent);
+}
+.progress .muted {
+  margin-left: 8px;
+}
+.setup-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.setup-actions.center {
+  justify-content: center;
+}
+.welcome {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 0;
+}
+.welcome .lead {
+  margin: 0;
+}
+.welcome-mark {
+  color: var(--accent);
+  font-size: 40px;
+  line-height: 1;
+}
+.big-number {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--ink-strong);
+  letter-spacing: 0.02em;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.choice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  min-height: 64px;
+}
+button.choice {
+  cursor: pointer;
+}
+button.choice:hover {
+  border-color: var(--border-strong);
+}
+.choice.selected {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.choice.disabled {
+  opacity: 0.75;
+}
+.choice-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.choice-main strong {
+  color: var(--ink-strong);
+}
+.choice-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.choice-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.option {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  cursor: pointer;
+  min-height: 32px;
+}
+.option input {
+  margin-top: 4px;
+  accent-color: var(--accent);
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.option > span {
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+}
+
+.setup-cta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-color: rgba(143, 191, 127, 0.4);
+}
+.setup-cta .lead {
+  margin: 6px 0 0;
+}
+.vault-storage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 16px;
+  align-items: center;
+}
+.vault-storage p {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.vault-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.confirm-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.login-expired {
+  margin-bottom: 16px;
+}
+
+@media (max-width: 760px) {
+  .vault-storage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .setup-actions {
+    justify-content: stretch;
+  }
+  .setup-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}

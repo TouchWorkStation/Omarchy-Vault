@@ -64,3 +64,52 @@ func TestValidateListen(t *testing.T) {
 		t.Errorf("explicit override rejected: %v", err)
 	}
 }
+
+func TestSaveAtomicPrivateRoundTrip(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "omarchy-vault")
+	p := filepath.Join(dir, "config.json")
+	cfg := Default()
+	cfg.Pool.Mode = "single"
+	cfg.Sources = []Source{{Path: "/mnt/wdred", Folder: "Vault", UUID: "u1", Label: "WD"}}
+	if err := Save(p, cfg); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(p)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode = %v %v", info.Mode().Perm(), err)
+	}
+	if d, _ := os.Stat(dir); d.Mode().Perm() != 0o700 {
+		t.Errorf("dir mode = %v", d.Mode().Perm())
+	}
+	got, found, err := Load(p)
+	if err != nil || !found || got.Sources[0].DataDir() != "/mnt/wdred/Vault" {
+		t.Fatalf("round trip: %+v %v", got, err)
+	}
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 1 {
+		t.Errorf("temp files left behind: %v", entries)
+	}
+
+	// Invalid configs are never written.
+	bad := cfg
+	bad.Sources = nil
+	if err := Save(p, bad); err == nil {
+		t.Fatal("saved an invalid config")
+	}
+	if again, _, _ := Load(p); len(again.Sources) != 1 {
+		t.Fatal("failed save damaged the existing config")
+	}
+}
+
+func TestValidateFolder(t *testing.T) {
+	for _, ok := range []string{"", "Vault", "Media/Vault", "My Vault", "a/b/c/d"} {
+		if err := ValidateFolder(ok); err != nil {
+			t.Errorf("%q: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"..", "../x", "a/../b", "/abs", "a/", "a//b", ".", "a\\b", "x\x00y", "a/b/c/d/e", "tab\tname"} {
+		if err := ValidateFolder(bad); err == nil {
+			t.Errorf("%q should be rejected", bad)
+		}
+	}
+}
