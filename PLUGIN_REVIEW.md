@@ -36,7 +36,7 @@ Thanks for reviewing Omarchy Vault. This page covers what the plugin does, what 
 | Install a **user** systemd unit with **no `[Install]` section**, so it never starts at login | `~/.config/systemd/user/omarchy-vault.service` | no |
 | Create the `/srv/vault` symlink, pointing at a user-owned link | `/srv/vault` | yes, once |
 | Allow TCP 8790 from the LAN subnet only (the subnet of the default route's interface; never `0.0.0.0/0`, skipped when ufw is absent) | ufw | yes |
-| Add keyboard shortcuts (below) | `~/.config/hypr/omarchy_vault.lua` plus one line in `hyprland.lua` | no |
+| Add keyboard shortcuts (below) | `~/.config/hypr/omarchy_vault.lua`, plus a comment and one load line in `hyprland.lua` | no |
 | Open the setup screen | browser | no |
 
 Things it never does: format, partition or mount drives; edit `/etc/fstab`; run as root; enable lingering; touch other plugins or Omarchy's files; run anything at `plugin add` or `plugin update` time.
@@ -106,7 +106,7 @@ go test -race ./...                    # unit and integration tests (shortcut in
 
 - Phone transfers use plain HTTP on the local network (documented). Users are told not to use them on untrusted Wi-Fi.
 - "Copy, then Super + Alt + D" reads the clipboard with `wl-paste` (Wayland) and only when the shortcut is pressed. It accepts `x-special/gnome-copied-files`, `text/uri-list` or plain absolute paths.
-- **Tested on the author's Omarchy Quattro machine:**
+- **Tested on the author's Omarchy machine (Lua config):**
   - installation
   - the Lua shortcuts
   - uploads from and downloads to a phone
