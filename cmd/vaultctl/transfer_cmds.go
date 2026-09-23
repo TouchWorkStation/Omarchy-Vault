@@ -33,7 +33,7 @@ type linkView struct {
 	} `json:"received"`
 }
 
-// upload: Super+Shift+U. Turns Vault on, creates an upload link and shows
+// upload: Super+Alt+U. Turns Vault on, creates an upload link and shows
 // its QR code in a small window (or the terminal with --terminal).
 func (a *app) upload(ctx context.Context, args []string) error {
 	folder, minutes, terminal := "", 0, false
@@ -82,7 +82,7 @@ func (a *app) upload(ctx context.Context, args []string) error {
 	return nil
 }
 
-// download: Super+Shift+D. Without a path it opens Vault's file picker;
+// download: Super+Alt+D. Without a path it opens Vault's file picker;
 // with one it creates a download link for that file or folder right away.
 func (a *app) download(ctx context.Context, args []string) error {
 	target, minutes, count, terminal := "", 0, 0, false

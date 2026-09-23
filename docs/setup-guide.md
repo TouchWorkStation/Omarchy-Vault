@@ -214,7 +214,7 @@ The installer explains each step and asks before anything optional:
 | `/srv/vault` | Creates the shortcut `/srv/vault` → your Vault (asks) | yes, once |
 | Programs | Installs `vaultd` and `vaultctl` to `~/.local/bin` | no |
 | Service | Installs the `omarchy-vault` user service. It **never starts by itself**; the installer asks whether to turn it on now | no |
-| Shortcuts | Checks Super+Shift+V/U/D for conflicts. Changes nothing (install them in section 7) | no |
+| Shortcuts | Checks Super+Alt+V/U/D for conflicts. Changes nothing (install them in section 7) | no |
 
 If `vaultctl` is "not found", add `~/.local/bin` to your PATH:
 
@@ -242,7 +242,7 @@ vaultctl off       # turn off (stops Files too)
 vaultctl status    # is it on?
 ```
 
-Opening Vault turns it on for you: `vaultctl open`, `vaultctl setup`, or the Super+Shift+V shortcut. Admins can also click **Turn off Vault** in the dashboard sidebar.
+Opening Vault turns it on for you: `vaultctl open`, `vaultctl setup`, or the Super+Alt+V shortcut. Admins can also click **Turn off Vault** in the dashboard sidebar.
 
 ## 4. First-run setup
 
@@ -351,9 +351,9 @@ Vault can add these, but only when you ask and only if they are free:
 
 | Shortcut | Does |
 |---|---|
-| Super + Shift + V | Open Vault |
-| Super + Shift + U | Upload to Vault (phone → Vault) |
-| Super + Shift + D | Download from Vault (Vault → phone) |
+| Super + Alt + V | Open Vault |
+| Super + Alt + U | Upload to Vault (phone → Vault) |
+| Super + Alt + D | Download from Vault (Vault → phone) |
 
 ```sh
 vaultctl shortcuts             # check: which are free, which are taken and by what
@@ -382,7 +382,7 @@ Send photos, videos and files from your phone into the Vault, with no app and no
 
 **Every time**
 
-1. Press **Super + Shift + U** (or run `vaultctl upload`, or click **Upload** in the dashboard). Vault turns on if it was off and shows a QR code.
+1. Press **Super + Alt + U** (or run `vaultctl upload`, or click **Upload** in the dashboard). Vault turns on if it was off and shows a QR code.
 2. Point your phone's camera at the code and tap the link.
 3. Choose **Select Photos**, **Take Photo**, **Select Videos** or **Choose Files**. You see progress for each file, then a list of what arrived.
 4. The files appear on the computer's screen as they arrive, and in **Vault → Phone Uploads** (`/srv/vault/Phone Uploads`).
@@ -407,7 +407,7 @@ The phone setup from section 8 (same Wi-Fi, firewall rule for port 8790) applies
 
 **Send a file or folder to your phone**
 
-1. Press **Super + Shift + D** (or click **Download** in the dashboard). Vault turns on if it was off and shows your Vault's folders.
+1. Press **Super + Alt + D** (or click **Download** in the dashboard). Vault turns on if it was off and shows your Vault's folders.
 2. Click a file or folder to choose it (**Open ›** goes into a folder). A folder arrives on the phone as one `.zip` file.
 3. Keep **To my phone**, choose how long the code works (10 minutes by default) and how many phones may use it (once by default), then **Show QR code**.
 4. Scan it with the phone's camera and tap **Download**. The screen on the computer says *Done* when it has been downloaded.
@@ -435,9 +435,9 @@ While a share link is active Vault stays on and keeps its phone port open (only 
 ## 10. Everyday use
 
 - **Turn on / off:** `vaultctl on` / `vaultctl off`. Vault never runs unless you turn it on.
-- **Open Vault:** `vaultctl open` (turns it on if needed), or Super + Shift + V once you've installed the shortcuts (section 7).
-- **Phone → Vault:** Super + Shift + U or `vaultctl upload` (section 8).
-- **Vault → Phone, share links:** Super + Shift + D or `vaultctl download` / `vaultctl share` (section 9).
+- **Open Vault:** `vaultctl open` (turns it on if needed), or Super + Alt + V once you've installed the shortcuts (section 7).
+- **Phone → Vault:** Super + Alt + U or `vaultctl upload` (section 8).
+- **Vault → Phone, share links:** Super + Alt + D or `vaultctl download` / `vaultctl share` (section 9).
 - **Status at a glance:** `vaultctl status`, or the Home page.
 - **Drive unplugged or not mounted (while Vault is on):** Vault shows your storage as *Offline*, pauses Files, and never writes anything to your system drive in the meantime. Plug the drive back in (or `sudo mount -a`) and everything resumes within about 20 seconds.
 - **Drive mounted somewhere else:** Vault shows *Drive moved*. Choose it again in Storage → *Use it at its new location*.
@@ -474,7 +474,7 @@ vaultctl logs -f        # live log of the Vault service
 | Phone says "can't connect" / page never loads | Phone on the same Wi-Fi (not mobile data, not a guest network)? Firewall rule from section 8 added? Some routers isolate Wi-Fi devices ("AP/client isolation"); turn that off for your home network |
 | "Your phone can't reach this computer: not connected to a local network" | The computer has no private network address (e.g. only a VPN). Connect to your home Wi-Fi/Ethernet, or set `"transfer": {"host": "<your LAN IP>"}` in `~/.config/omarchy-vault/config.json` |
 | "port 8790 is in use by another program" | Set another port: `"transfer": {"port": 8791}` in config.json (and allow it in ufw) |
-| "LINK ENDED" on the phone | The code expired, was stopped or was used up. Make a new one (Super + Shift + U or D) |
+| "LINK ENDED" on the phone | The code expired, was stopped or was used up. Make a new one (Super + Alt + U or D) |
 | Share link asks for a password you don't have | Ask the person who shared it. After several wrong tries it waits 1–15 minutes |
 | "That folder has too many files" | Folder links hold up to 20 000 files; share a smaller folder |
 | A second phone can't download | The code was for one download. Choose more downloads, or make a new code |

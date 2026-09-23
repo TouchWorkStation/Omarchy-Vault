@@ -31,7 +31,7 @@ type Planned struct {
 	Since int `json:"since"`
 }
 
-// Combo renders the binding for humans, e.g. "Super + Shift + U".
+// Combo renders the binding for humans, e.g. "Super + Alt + U".
 func (p Planned) Combo() string { return comboString(p.Mods, p.Key) }
 
 // Line renders the Hyprland config line Vault would install.
@@ -42,9 +42,9 @@ func (p Planned) Line() string {
 // Plan is the default set of Vault shortcuts.
 func Plan() []Planned {
 	return []Planned{
-		{ID: "open", Label: "Open Vault", Direction: "", Mods: []string{"SUPER", "SHIFT"}, Key: "V", Command: "vaultctl open", Description: "Open Vault", Since: 1},
-		{ID: "upload", Label: "Upload to Vault", Direction: "Phone → Vault", Mods: []string{"SUPER", "SHIFT"}, Key: "U", Command: "vaultctl upload", Description: "Upload to Vault", Since: 4},
-		{ID: "download", Label: "Download from Vault", Direction: "Vault → Phone", Mods: []string{"SUPER", "SHIFT"}, Key: "D", Command: "vaultctl download", Description: "Download from Vault", Since: 5},
+		{ID: "open", Label: "Open Vault", Direction: "", Mods: []string{"SUPER", "ALT"}, Key: "V", Command: "vaultctl open", Description: "Open Vault", Since: 1},
+		{ID: "upload", Label: "Upload to Vault", Direction: "Phone → Vault", Mods: []string{"SUPER", "ALT"}, Key: "U", Command: "vaultctl upload", Description: "Upload to Vault", Since: 4},
+		{ID: "download", Label: "Download from Vault", Direction: "Vault → Phone", Mods: []string{"SUPER", "ALT"}, Key: "D", Command: "vaultctl download", Description: "Download from Vault", Since: 5},
 	}
 }
 
@@ -312,9 +312,9 @@ func appendUnique(list []Binding, b Binding) []Binding {
 // suggest proposes a free alternative for a conflicting shortcut.
 func suggest(p Planned, existing []Binding) (Planned, bool) {
 	alts := [][]string{
-		{"SUPER", "ALT"},
-		{"SUPER", "CTRL", "SHIFT"},
+		{"SUPER", "SHIFT"},
 		{"SUPER", "CTRL", "ALT"},
+		{"SUPER", "CTRL", "SHIFT"},
 	}
 	for _, mods := range alts {
 		free := true

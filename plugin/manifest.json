@@ -62,19 +62,19 @@
   "shortcuts": [
     {
       "id": "open",
-      "combo": "SUPER SHIFT, V",
+      "combo": "SUPER ALT, V",
       "label": "Open Vault",
       "command": "vaultctl open"
     },
     {
       "id": "upload",
-      "combo": "SUPER SHIFT, U",
+      "combo": "SUPER ALT, U",
       "label": "Upload to Vault",
       "command": "vaultctl upload"
     },
     {
       "id": "download",
-      "combo": "SUPER SHIFT, D",
+      "combo": "SUPER ALT, D",
       "label": "Download from Vault",
       "command": "vaultctl download"
     }

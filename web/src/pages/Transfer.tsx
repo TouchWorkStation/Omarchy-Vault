@@ -32,7 +32,7 @@ export function QrImage({ svg, size = 300 }: { svg: string; size?: number }) {
   );
 }
 
-// The window Super+Shift+U / Super+Shift+D open: a big QR code and live
+// The window Super+Alt+U / Super+Alt+D open: a big QR code and live
 // progress. Share links show the same page with the link to copy.
 export function Transfer({ id }: { id: string }) {
   const { data: link, error, reload } = useApi<LinkView>(`/api/link/${encodeURIComponent(id)}`, 2000);

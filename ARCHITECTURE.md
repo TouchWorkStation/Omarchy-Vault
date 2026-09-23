@@ -113,7 +113,7 @@ browser ──► vaultd :8788 ──(/files/*, Vault session required)──►
 ## Transfers (Milestones 4–5)
 
 ```
-Super+Shift+U → vaultctl upload → (turns Vault on) → POST /api/upload-session
+Super+Alt+U → vaultctl upload → (turns Vault on) → POST /api/upload-session
    → 32-byte random token, stored as SHA-256 hash in vault.db, scope = "upload into Phone Uploads", expires 10 min
    → phone listener starts on <LAN IP>:8790 (only while a link is active)
    → QR: http://<LAN IP>:8790/u/<token>   (no paths in the URL)
@@ -129,7 +129,7 @@ Link expires / Stop → listener closes
 Downloads and shares use the same store, listener and token rules:
 
 ```
-Super+Shift+D → vaultctl download → opens /download (file picker over GET /api/browse)
+Super+Alt+D → vaultctl download → opens /download (file picker over GET /api/browse)
    → POST /api/download-session {path} → token scope = one file or folder, max_downloads (default 1)
    → QR: http://<LAN IP>:8790/d/<token>
 Phone → GET /d/<token> (page) → GET /d/<token>/file

@@ -27,8 +27,8 @@ Rectangle {
         Repeater {
             model: [
                 { id: "power", label: "TURN ON / OFF", detail: "Vault only runs when you turn it on" },
-                { id: "upload", label: "UPLOAD", detail: "Phone → Vault  ·  Super+Shift+U" },
-                { id: "download", label: "DOWNLOAD", detail: "Vault → Phone  ·  Super+Shift+D" },
+                { id: "upload", label: "UPLOAD", detail: "Phone → Vault  ·  Super+Alt+U" },
+                { id: "download", label: "DOWNLOAD", detail: "Vault → Phone  ·  Super+Alt+D" },
                 { id: "files", label: "OPEN FILES", detail: "Browse your Vault" },
                 { id: "storage", label: "STORAGE", detail: "Drives and health" }
             ]

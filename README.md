@@ -18,8 +18,8 @@ It is **not** a replacement for TrueNAS, Unraid or ZimaOS. Vault uses the drives
 | You do | Vault handles |
 |---|---|
 | Pick a drive or folder in setup | safe adoption, system disk protection |
-| Press Super+Shift+U | a short-lived upload-only link and a QR code |
-| Press Super+Shift+D, pick a file | a short-lived download link and a QR code |
+| Press Super+Alt+U | a short-lived upload-only link and a QR code |
+| Press Super+Alt+D, pick a file | a short-lived download link and a QR code |
 | Create a user for family | SFTPGo accounts, folders, permissions |
 
 ![Vault dashboard](docs/screenshots/dashboard.png)
@@ -30,8 +30,8 @@ It is **not** a replacement for TrueNAS, Unraid or ZimaOS. Vault uses the drives
 
 | Works now | Coming |
 |---|---|
-| **Upload to Vault**: Super+Shift+U, scan the QR code, send photos/videos/files from your phone (M4) | Combining several drives, drive health alerts (M6) |
-| **Download from Vault**: Super+Shift+D, pick a file or folder, scan, it downloads to your phone (M5) | |
+| **Upload to Vault**: Super+Alt+U, scan the QR code, send photos/videos/files from your phone (M4) | Combining several drives, drive health alerts (M6) |
+| **Download from Vault**: Super+Alt+D, pick a file or folder, scan, it downloads to your phone (M5) | |
 | **Share links** on your Wi-Fi: read only, up to 24 hours, download limits, optional password (M5) | |
 | Turns itself off after 15 minutes with nothing to do | |
 | First-run setup: choose a drive, create your admin account | |
@@ -47,8 +47,8 @@ It is **not** a replacement for TrueNAS, Unraid or ZimaOS. Vault uses the drives
 ## Features (v0.1)
 
 - **Storage**: use one drive or a folder on it (combining several drives comes in M6). Existing filesystems only; nothing is formatted.
-- **Upload to Vault** (`Super + Shift + U`): scan a QR code with your phone, pick photos, videos or files. They land in `Phone Uploads`.
-- **Download from Vault** (`Super + Shift + D`): pick a file or folder, scan the QR code, it downloads to your phone.
+- **Upload to Vault** (`Super + Alt + U`): scan a QR code with your phone, pick photos, videos or files. They land in `Phone Uploads`.
+- **Download from Vault** (`Super + Alt + D`): pick a file or folder, scan the QR code, it downloads to your phone.
 - **Share links**: read only, on your Wi-Fi, up to 24 hours, optional password, stop any time.
 - **Files**: browse, upload and download in the browser on this computer.
 - **Users**: Admin, Family, Guest; read/write or read-only per folder.
@@ -63,7 +63,7 @@ It is **not** a replacement for TrueNAS, Unraid or ZimaOS. Vault uses the drives
 sudo pacman -S --needed git && { git -C ~/Omarchy-Vault pull --ff-only 2>/dev/null || git clone https://github.com/TouchWorkStation/Omarchy-Vault.git ~/Omarchy-Vault; } && ~/Omarchy-Vault/scripts/install.sh --express
 ```
 
-It installs what it needs, builds Vault, allows phones on your home network to reach it (port 8790, your network only), adds Super+Shift+V/U/D (only if free) and opens the setup screen: pick your drive, create your account, done. It asks for your password for `sudo` a couple of times. Add `--with-files` to also build the Files browser.
+It installs what it needs, builds Vault, allows phones on your home network to reach it (port 8790, your network only), adds Super+Alt+V/U/D (only if free) and opens the setup screen: pick your drive, create your account, done. It asks for your password for `sudo` a couple of times. Add `--with-files` to also build the Files browser.
 
 Prefer to go step by step?
 
@@ -73,7 +73,7 @@ cd ~/Omarchy-Vault
 ./scripts/install.sh --dry-run   # see exactly what will happen
 ./scripts/install.sh             # asks before each optional step
 vaultctl setup                   # turns Vault on, then choose your drive and create your account
-vaultctl shortcuts install       # Super+Shift+V/U/D, only the free ones
+vaultctl shortcuts install       # Super+Alt+V/U/D, only the free ones
 ```
 
 Vault **only runs when you turn it on**. Nothing starts at login or boot.
@@ -155,8 +155,8 @@ Screenshots use `--demo` data.
 1. ✅ Foundation: dashboard, read-only drive discovery, shortcut planning
 2. ✅ Single-drive Vault, config, `/srv/vault`, system disk protection
 3. ✅ SFTPGo files and users
-4. ✅ Upload to Vault (Super+Shift+U), QR, mobile upload page
-5. ✅ Download from Vault (Super+Shift+D), file picker, mobile download page, share links
+4. ✅ Upload to Vault (Super+Alt+U), QR, mobile upload page
+5. ✅ Download from Vault (Super+Alt+D), file picker, mobile download page, share links
 6. Combining drives with mergerfs, SMART monitoring, optional LAN sharing
 
 Not planned: remote access from outside your home (Cloudflare, VPN) and automatic backups. Vault is deliberately local and short-lived.

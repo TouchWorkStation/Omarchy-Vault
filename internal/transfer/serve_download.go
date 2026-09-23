@@ -32,7 +32,7 @@ func friendlyOut(err error) string {
 }
 
 func (s *Server) ended(w http.ResponseWriter, err error, kind Kind) {
-	hint := "Ask for a new code: press Super + Shift + D on the Vault computer."
+	hint := "Ask for a new code: press the Vault download shortcut on the computer."
 	if kind == KindShare {
 		hint = "Ask the person who shared it for a new link."
 	}

@@ -46,7 +46,7 @@ Dashboard summary.
   "auto_off_minutes": 15,
   "users": { "count": null, "milestone": 3 },
   "services": [ { "id": "smartctl", "name": "Drive health", "installed": true, "milestone": 1, "…": "…" } ],
-  "shortcuts": [ { "id": "upload", "label": "Upload to Vault", "combo": "Super + Shift + U", "status": "available" } ],
+  "shortcuts": [ { "id": "upload", "label": "Upload to Vault", "combo": "Super + Alt + U", "status": "available" } ],
   "warnings": []
 }
 ```
@@ -186,8 +186,8 @@ Shortcut plan and conflict analysis. See [shortcuts.md](shortcuts.md).
 ```json
 { "sources": ["hyprctl", "/home/me/.config/hypr/hyprland.conf"], "installed": false,
   "checks": [ { "id": "download", "label": "Download from Vault", "direction": "Vault → Phone",
-                "combo": "Super + Shift + D", "status": "conflict",
-                "binding_line": "bindd = SUPER SHIFT, D, Download from Vault, exec, vaultctl download",
+                "combo": "Super + Alt + D", "status": "conflict",
+                "binding_line": "bindd = SUPER ALT, D, Download from Vault, exec, vaultctl download",
                 "conflicts": [ { "mods": ["SUPER","SHIFT"], "key": "D", "dispatcher": "exec",
                                  "arg": "omarchy-launch-tui lazydocker", "description": "Lazydocker",
                                  "source": "/home/me/.local/share/omarchy/default/hypr/bindings/tui.conf" } ],

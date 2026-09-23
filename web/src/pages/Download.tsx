@@ -250,7 +250,7 @@ function ActiveLinks({ kind, title, empty }: { kind: "download" | "share"; title
   );
 }
 
-// The page Super+Shift+D opens.
+// The page Super+Alt+D opens.
 export function Download() {
   const { data: session } = useApi<Session>("/api/session");
   const [picked, setPicked] = useState<BrowseEntry | null>(null);
@@ -268,7 +268,7 @@ export function Download() {
       <Card title="CHOOSE A FILE OR FOLDER">
         <Picker onPick={setPicked} picked={picked} />
         <p className="muted small">
-          Shortcut: <Kbd combo="Super + Shift + D" /> · Click to choose, <em>Open</em> to go into a folder.
+          Shortcut: <Kbd combo="Super + Alt + D" /> · Click to choose, <em>Open</em> to go into a folder.
         </p>
       </Card>
 

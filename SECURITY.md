@@ -48,7 +48,7 @@ A root-level attacker on the machine, physical theft of unencrypted drives (use 
 
 ## Off by default
 
-Vault runs only when the user turns it on (`vaultctl on`, `vaultctl open`, the Super+Shift+V shortcut). The systemd user unit deliberately has no `[Install]` section, so it cannot start at login or boot, and the installer removes start-at-login from earlier versions. `vaultctl off` or the dashboard's **Turn off Vault** (admins only) stops vaultd and its file service; nothing keeps listening. The smallest attack surface is a service that isn't running.
+Vault runs only when the user turns it on (`vaultctl on`, `vaultctl open`, the Super+Alt+V shortcut). The systemd user unit deliberately has no `[Install]` section, so it cannot start at login or boot, and the installer removes start-at-login from earlier versions. `vaultctl off` or the dashboard's **Turn off Vault** (admins only) stops vaultd and its file service; nothing keeps listening. The smallest attack surface is a service that isn't running.
 
 ## Accounts and sign-in (Milestone 3)
 

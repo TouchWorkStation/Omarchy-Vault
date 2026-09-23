@@ -236,7 +236,7 @@ cat <<MSG
     Set up storage:    vaultctl setup          (turns Vault on, opens the setup screens)
     Open Vault:        vaultctl open           (turns Vault on, http://127.0.0.1:8788)
     Phone → Vault:     vaultctl upload         (QR code; phone on the same Wi-Fi)
-    Add shortcuts:     vaultctl shortcuts install   (Super+Shift+V/U/D)
+    Add shortcuts:     vaultctl shortcuts install   (Super+Alt+V/U/D)
 
     Vault never runs by itself: nothing starts at login or boot.
     Check everything:  vaultctl doctor

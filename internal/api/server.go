@@ -481,7 +481,7 @@ func (s *Server) handlePowerOff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Log.Info("turning off", "by", identityFrom(r).Username)
-	writeJSON(w, http.StatusOK, map[string]string{"message": "Vault is turning off. Turn it on again with Super+Shift+V or `vaultctl on`."})
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Vault is turning off. Turn it on again with Super+Alt+V or `vaultctl on`."})
 	go func() {
 		time.Sleep(300 * time.Millisecond)
 		s.PowerOff()

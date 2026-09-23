@@ -86,7 +86,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
         <button className="btn btn-primary btn-block" disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}
         </button>
-        <p className="muted small">On this computer you can also press Super+Shift+V.</p>
+        <p className="muted small">On this computer you can also press Super+Alt+V.</p>
       </form>
     </div>
   );

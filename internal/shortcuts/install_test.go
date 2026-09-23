@@ -15,7 +15,7 @@ func TestInstallAndRemove(t *testing.T) {
 	conf := filepath.Join(hypr, "hyprland.conf")
 	original := "# my config\nsource = ~/.config/hypr/bindings.conf\n"
 	os.WriteFile(conf, []byte(original), 0o600)
-	os.WriteFile(filepath.Join(hypr, "bindings.conf"), []byte("bindd = SUPER SHIFT, D, Docker, exec, lazydocker\n"), 0o644)
+	os.WriteFile(filepath.Join(hypr, "bindings.conf"), []byte("bindd = SUPER ALT, D, Docker, exec, lazydocker\n"), 0o644)
 
 	in := Inspector{ConfigPath: conf, Home: home}
 	rep := in.Analyze(context.Background())
@@ -88,12 +88,12 @@ func TestInstallRefusesForeignFileAndNoConfig(t *testing.T) {
 }
 
 func TestChooseSuggestions(t *testing.T) {
-	sug := Planned{ID: "upload", Mods: []string{"SUPER", "ALT"}, Key: "U", Command: "vaultctl upload", Since: 4}
+	sug := Planned{ID: "upload", Mods: []string{"SUPER", "SHIFT"}, Key: "U", Command: "vaultctl upload", Since: 4}
 	rep := Report{Sources: []string{"x"}, Checks: []Check{{Planned: Plan()[1], Status: "conflict", Suggestion: &sug}}}
 	if bs, _, _ := Choose(rep, 4, false); len(bs) != 0 {
 		t.Error("conflict installed without --use-suggestions")
 	}
-	if bs, _, _ := Choose(rep, 4, true); len(bs) != 1 || bs[0].Combo() != "Super + Alt + U" {
+	if bs, _, _ := Choose(rep, 4, true); len(bs) != 1 || bs[0].Combo() != "Super + Shift + U" {
 		t.Errorf("suggestion = %+v", bs)
 	}
 }

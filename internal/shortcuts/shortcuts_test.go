@@ -22,10 +22,10 @@ func checkByID(t *testing.T, r Report, id string) Check {
 
 func TestParseMods(t *testing.T) {
 	cases := map[string]string{
-		"SUPER SHIFT":  "SUPER SHIFT",
-		"SUPER_SHIFT":  "SUPER SHIFT",
-		"shift+super":  "SUPER SHIFT",
-		"WIN SHIFT":    "SUPER SHIFT",
+		"SUPER ALT":    "SUPER ALT",
+		"SUPER_ALT":    "SUPER ALT",
+		"alt+super":    "SUPER ALT",
+		"WIN ALT":      "SUPER ALT",
 		"MOD4 CONTROL": "SUPER CTRL",
 		"SUPER CAPS":   "SUPER",
 		"":             "",
@@ -53,8 +53,8 @@ func TestConfigFileAnalysis(t *testing.T) {
 	if u.Status != "conflict" || len(u.Conflicts) != 1 || u.Conflicts[0].Arg != "beam send" {
 		t.Fatalf("U: %+v", u)
 	}
-	if u.Suggestion == nil || u.Suggestion.Combo() != "Super + Ctrl + Shift + U" {
-		t.Errorf("U suggestion = %+v (SUPER ALT U is taken)", u.Suggestion)
+	if u.Suggestion == nil || u.Suggestion.Combo() != "Super + Ctrl + Alt + U" {
+		t.Errorf("U suggestion = %+v (SUPER SHIFT U is taken)", u.Suggestion)
 	}
 	if strings.Join(u.Options, ",") != "choose_another,copy_binding,skip" {
 		t.Errorf("options = %v", u.Options)
@@ -64,10 +64,10 @@ func TestConfigFileAnalysis(t *testing.T) {
 	if d.Status != "conflict" || d.Conflicts[0].Description != "Lazydocker" {
 		t.Fatalf("D: %+v", d)
 	}
-	if d.Suggestion == nil || d.Suggestion.Combo() != "Super + Alt + D" {
+	if d.Suggestion == nil || d.Suggestion.Combo() != "Super + Shift + D" {
 		t.Errorf("D suggestion = %+v", d.Suggestion)
 	}
-	if !strings.HasPrefix(d.Line, "bindd = SUPER SHIFT, D, Download from Vault, exec, vaultctl download") {
+	if !strings.HasPrefix(d.Line, "bindd = SUPER ALT, D, Download from Vault, exec, vaultctl download") {
 		t.Errorf("line = %q", d.Line)
 	}
 }

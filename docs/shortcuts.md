@@ -4,9 +4,9 @@ Vault uses the Vault's point of view:
 
 | Shortcut | Action | Direction | Command |
 |---|---|---|---|
-| Super + Shift + V | Open Vault | | `vaultctl open` |
-| Super + Shift + U | **Upload to Vault** | Phone → Vault | `vaultctl upload` |
-| Super + Shift + D | **Download from Vault** | Vault → Phone | `vaultctl download` |
+| Super + Alt + V | Open Vault | | `vaultctl open` |
+| Super + Alt + U | **Upload to Vault** | Phone → Vault | `vaultctl upload` |
+| Super + Alt + D | **Download from Vault** | Vault → Phone | `vaultctl download` |
 
 ## Strategy
 
@@ -17,11 +17,11 @@ Vault uses the Vault's point of view:
 
    ```
    Shortcut Conflict
-   Super + Shift + D is already assigned.
+   Super + Alt + D is already assigned.
 
    Options:
    - Choose Another Shortcut   (e.g. Super + Alt + D, checked to be free)
-   - Copy Binding Command      bindd = SUPER SHIFT, D, Download from Vault, exec, vaultctl download
+   - Copy Binding Command      bindd = SUPER ALT, D, Download from Vault, exec, vaultctl download
    - Skip Shortcut
    ```
 
@@ -56,7 +56,7 @@ vaultctl shortcuts install --use-suggestions  # a taken shortcut gets its free a
 vaultctl shortcuts install --yes              # no question (for scripts)
 ```
 
-It installs only shortcuts whose command exists already and only those that are free. If you installed them before Milestone 5, run it again to add Super + Shift + D. A taken one is skipped, never overwritten, unless you pass `--use-suggestions`, which uses the checked-free alternative (e.g. Super + Alt + U). Hyprland reloads its config by itself, so they work at once.
+It installs only shortcuts whose command exists already and only those that are free. If you installed them before Milestone 5, run it again to add the Download shortcut. A taken one is skipped, never overwritten, unless you pass `--use-suggestions`, which uses the checked-free alternative (e.g. Super + Alt + U). Hyprland reloads its config by itself, so they work at once.
 
 What it writes:
 
@@ -81,7 +81,7 @@ Deletes Vault's file and exactly those two lines; the rest of `hyprland.conf` st
 Add to `~/.config/hypr/bindings.conf`:
 
 ```
-bindd = SUPER SHIFT, V, Open Vault, exec, vaultctl open
-bindd = SUPER SHIFT, U, Upload to Vault, exec, vaultctl upload
-bindd = SUPER SHIFT, D, Download from Vault, exec, vaultctl download
+bindd = SUPER ALT, V, Open Vault, exec, vaultctl open
+bindd = SUPER ALT, U, Upload to Vault, exec, vaultctl upload
+bindd = SUPER ALT, D, Download from Vault, exec, vaultctl download
 ```

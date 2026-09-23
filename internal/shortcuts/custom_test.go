@@ -8,8 +8,8 @@ import (
 )
 
 func TestBuildValidates(t *testing.T) {
-	p, err := Build(Request{ID: "upload", Mods: []string{"shift", "super"}, Key: "u"})
-	if err != nil || strings.Join(p.Mods, " ") != "SUPER SHIFT" || p.Key != "U" || p.Command != "vaultctl upload" {
+	p, err := Build(Request{ID: "upload", Mods: []string{"alt", "super"}, Key: "u"})
+	if err != nil || strings.Join(p.Mods, " ") != "SUPER ALT" || p.Key != "U" || p.Command != "vaultctl upload" {
 		t.Fatalf("build = %+v %v", p, err)
 	}
 	for _, bad := range []Request{
@@ -27,14 +27,14 @@ func TestBuildValidates(t *testing.T) {
 
 func TestCheckAll(t *testing.T) {
 	existing := []Binding{
-		{Mods: []string{"SUPER", "SHIFT"}, Key: "D", Dispatcher: "exec", Arg: "lazydocker", Source: "/h/.config/hypr/bindings.conf"},
+		{Mods: []string{"SUPER", "ALT"}, Key: "D", Dispatcher: "exec", Arg: "lazydocker", Source: "/h/.config/hypr/bindings.conf"},
 		// Vault's own current binding may be replaced.
-		{Mods: []string{"SUPER", "SHIFT"}, Key: "U", Dispatcher: "exec", Arg: "/h/.local/bin/vaultctl upload", Source: "hyprctl"},
+		{Mods: []string{"SUPER", "ALT"}, Key: "U", Dispatcher: "exec", Arg: "/h/.local/bin/vaultctl upload", Source: "hyprctl"},
 	}
 	res := CheckAll(existing, []Request{
-		{ID: "download", Mods: []string{"SUPER", "SHIFT"}, Key: "D"},
-		{ID: "upload", Mods: []string{"SUPER", "SHIFT"}, Key: "U"},
-		{ID: "open", Mods: []string{"SUPER", "SHIFT"}, Key: "U"},
+		{ID: "download", Mods: []string{"SUPER", "ALT"}, Key: "D"},
+		{ID: "upload", Mods: []string{"SUPER", "ALT"}, Key: "U"},
+		{ID: "open", Mods: []string{"SUPER", "ALT"}, Key: "U"},
 		{ID: "open", Mods: []string{"SHIFT"}, Key: "V"},
 	})
 	want := []string{"conflict", "available", "duplicate", "invalid"}
@@ -43,7 +43,7 @@ func TestCheckAll(t *testing.T) {
 			t.Errorf("%d %s: %s (%s), want %s", i, r.ID, r.Status, r.Message, want[i])
 		}
 	}
-	if res[0].Suggestion == nil || res[0].Suggestion.Combo() != "Super + Alt + D" {
+	if res[0].Suggestion == nil || res[0].Suggestion.Combo() != "Super + Shift + D" {
 		t.Errorf("suggestion = %+v", res[0].Suggestion)
 	}
 }

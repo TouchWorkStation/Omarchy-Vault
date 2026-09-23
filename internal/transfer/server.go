@@ -327,7 +327,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	sess, err := s.lookup(r)
 	if err != nil {
 		w.WriteHeader(http.StatusGone)
-		_ = pages.ExecuteTemplate(w, "ended.html", pageData{Message: friendly(err), Hint: "Ask for a new code: press Super + Shift + U on the Vault computer."})
+		_ = pages.ExecuteTemplate(w, "ended.html", pageData{Message: friendly(err), Hint: "Ask for a new code: press the Vault upload shortcut on the computer."})
 		return
 	}
 	_ = pages.ExecuteTemplate(w, "upload.html", pageData{Folder: sess.Folder, Expires: sess.ExpiresAt.UnixMilli()})

@@ -49,13 +49,13 @@ Vault is built in milestones. Each ends in a working, tested, committed state. N
 - Mobile upload page: Select Photos, Take Photo, Select Videos, Choose Files; per-file progress; result list; Upload more
 - Files stream straight to the drive, never overwrite (`photo (1).jpg`), keep 1 GB free
 - Dashboard: Upload page, live QR page with countdown and received list, Recent files on Home
-- `vaultctl upload [--folder] [--minutes] [--terminal]`; Super+Shift+U
+- `vaultctl upload [--folder] [--minutes] [--terminal]`; Super+Alt+U
 - `vaultctl shortcuts install / remove`: installs only free shortcuts, after showing exactly what it writes
 - Beam: `POST /api/v1/beam/upload-session` (local owner token)
 
 ## ✅ Milestone 5: Download from Vault
 
-- File picker in the dashboard (`GET /api/browse`, only folders you can open; no symlinks, hidden or unfinished files); Super+Shift+D opens it
+- File picker in the dashboard (`GET /api/browse`, only folders you can open; no symlinks, hidden or unfinished files); Super+Alt+D opens it
 - `vaultctl download [<file or folder>] [--minutes N] [--downloads N] [--terminal]`
 - `POST /api/download-session`: one file or folder, 10 minutes and 1 download by default (up to 60 min, 10 phones); a download counts once per phone, so resuming doesn't use it up
 - Folders download as a zip streamed on the fly (no temporary copy)

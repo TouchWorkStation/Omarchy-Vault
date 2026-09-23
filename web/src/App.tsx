@@ -123,7 +123,7 @@ export function App() {
       await send("POST", "/api/power/off");
     } finally {
       document.body.innerHTML =
-        '<main class="off"><h1>VAULT IS OFF</h1><p>Nothing is running in the background.</p><p>Turn it on again with Super+Shift+V or <code>vaultctl on</code>.</p></main>';
+        '<main class="off"><h1>VAULT IS OFF</h1><p>Nothing is running in the background.</p><p>Turn it on again with Super+Alt+V or <code>vaultctl on</code>.</p></main>';
     }
   }
 
@@ -184,7 +184,7 @@ export function App() {
             <span className="notice-glyph" aria-hidden="true">
               !
             </span>
-            <div>That sign-in link expired. Open Vault again with Super+Shift+V or vaultctl open.</div>
+            <div>That sign-in link expired. Open Vault again with Super+Alt+V or vaultctl open.</div>
           </div>
         )}
         {session.demo && (

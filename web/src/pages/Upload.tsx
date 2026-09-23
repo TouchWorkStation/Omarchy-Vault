@@ -84,7 +84,7 @@ export function Upload() {
             </button>
           </div>
           <p className="muted small">
-            Shortcut: <Kbd combo="Super + Shift + U" /> · Your phone must be on the same Wi-Fi as this computer.
+            Shortcut: <Kbd combo="Super + Alt + U" /> · Your phone must be on the same Wi-Fi as this computer.
           </p>
         </Card>
       )}

@@ -15,7 +15,7 @@ import (
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/users"
 )
 
-const changeHint = "To make changes, open Vault on this computer with Super+Shift+V or `vaultctl open`."
+const changeHint = "To make changes, open Vault on this computer with Super+Alt+V or `vaultctl open`."
 
 // localIdentity is who the local token (or a vaultctl-open session) acts
 // as: the owner of this computer, with admin rights.
