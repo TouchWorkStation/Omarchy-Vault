@@ -64,7 +64,7 @@ ask() {
 
 # 1. Never run as root: Vault runs as your user.
 if [[ $EUID -eq 0 ]]; then
-  echo "Run the installer as your normal user, not root. It will ask for sudo only to install packages." >&2
+  echo "Run the installer as your normal user, not root. It asks for sudo only for packages, the /srv/vault link and the firewall rule." >&2
   exit 1
 fi
 

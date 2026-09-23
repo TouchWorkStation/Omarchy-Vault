@@ -71,6 +71,8 @@ This puts a Vault icon in the bar. Omarchy's plugin installer never runs code fr
 
 The same actions have keyboard shortcuts: Super + Alt + V, U and D (change them in Settings).
 
+Reviewing the plugin? See [PLUGIN_REVIEW.md](PLUGIN_REVIEW.md): what it loads, what the installer touches, and how to remove it.
+
 **Removing it:** first remove Vault itself, then the plugin:
 
 ```sh
