@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -84,5 +85,32 @@ func TestVaultRel(t *testing.T) {
 	}
 	if _, err := a.vaultRel(t.TempDir()); err == nil {
 		t.Error("path outside the Vault accepted")
+	}
+}
+
+func TestLaunchFallsThroughFailingLauncher(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) {
+		os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\n"+body+"\n"), 0o755)
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("WAYLAND_DISPLAY", "wayland-1")
+
+	write("xdg-open", `echo "xdg-open: no method available for opening '$1'" >&2; exit 3`)
+	if err := launch("http://127.0.0.1:8788/setup"); err == nil || !strings.Contains(err.Error(), "no method available") {
+		t.Errorf("failing xdg-open: err = %v", err)
+	}
+	write("omarchy-launch-webapp", `exit 0`)
+	if err := launch("http://127.0.0.1:8788/setup"); err != nil {
+		t.Errorf("web-app launcher: %v", err)
+	}
+	write("omarchy-launch-webapp", `exec /bin/sleep 5`)
+	if err := launch("http://127.0.0.1:8788/setup"); err != nil {
+		t.Errorf("long-running window: %v", err)
+	}
+	t.Setenv("WAYLAND_DISPLAY", "")
+	t.Setenv("DISPLAY", "")
+	if err := launch("http://x"); err == nil {
+		t.Error("no display should be an error")
 	}
 }

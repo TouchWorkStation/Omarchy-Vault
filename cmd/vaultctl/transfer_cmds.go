@@ -286,15 +286,55 @@ func (a *app) openApp(ctx context.Context, path string) error {
 	if err := a.call(ctx, http.MethodPost, "/api/local-login", nil, &lr); err != nil {
 		return err
 	}
-	url := a.baseURL() + lr.Path + "&next=" + path
-	for _, launcher := range [][]string{{"omarchy-launch-webapp", url}, {"xdg-open", url}} {
-		if p, err := exec.LookPath(launcher[0]); err == nil {
-			cmd := exec.Command(p, launcher[1:]...)
-			cmd.Stdout, cmd.Stderr = nil, nil
-			return cmd.Start()
+	return launch(a.baseURL() + lr.Path + "&next=" + path)
+}
+
+// launch opens url in a window: Omarchy's web-app window if available,
+// otherwise the default browser. A launcher that fails within a moment
+// (no browser configured, no display) falls through to the next one.
+func launch(url string) error {
+	if !hasDisplay() {
+		return errors.New("no graphical session")
+	}
+	var last error = errors.New("no browser launcher found (install xdg-utils)")
+	for _, name := range []string{"omarchy-launch-webapp", "xdg-open"} {
+		p, err := exec.LookPath(name)
+		if err != nil {
+			continue
+		}
+		cmd := exec.Command(p, url)
+		var stderr strings.Builder
+		cmd.Stdout, cmd.Stderr = nil, &stderr
+		if err := cmd.Start(); err != nil {
+			last = err
+			continue
+		}
+		done := make(chan error, 1)
+		go func() { done <- cmd.Wait() }()
+		select {
+		case err := <-done:
+			if err == nil {
+				return nil // handed off to a running browser
+			}
+			msg := firstLine(stderr.String(), err.Error())
+			if !strings.HasPrefix(msg, name) {
+				msg = name + ": " + msg
+			}
+			last = errors.New(msg)
+		case <-time.After(1500 * time.Millisecond):
+			return nil // still running: the window is open
 		}
 	}
-	return errors.New("no browser launcher found")
+	return last
+}
+
+func firstLine(s, fallback string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return fallback
+	}
+	line, _, _ := strings.Cut(s, "\n")
+	return line
 }
 
 func (a *app) watchInTerminal(ctx context.Context, link linkView) error {

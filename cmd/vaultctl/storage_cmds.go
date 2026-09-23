@@ -305,13 +305,13 @@ func (a *app) openPage(ctx context.Context, path string) error {
 	} else if err != nil {
 		fmt.Fprintf(os.Stderr, "vaultctl: opening read-only (%v)\n", err)
 	}
-	if _, err := exec.LookPath("xdg-open"); err != nil {
-		fmt.Fprintln(a.out, url)
-		return nil
+	if err := launch(url); err != nil {
+		fmt.Fprintf(a.out, "Couldn't open a browser window (%v).\n", err)
+	} else {
+		fmt.Fprintln(a.out, "Opening Vault in a browser window…")
 	}
-	cmd := exec.Command("xdg-open", url)
-	cmd.Stdout, cmd.Stderr = nil, nil
-	return cmd.Start()
+	fmt.Fprintf(a.out, "If nothing appears, open %s%s in your browser (or run: vaultctl open).\n", base, path)
+	return nil
 }
 
 // linkRoot creates /srv/vault -> ~/.local/share/omarchy-vault/current, the
