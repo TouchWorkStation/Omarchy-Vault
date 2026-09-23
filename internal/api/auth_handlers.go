@@ -13,6 +13,7 @@ import (
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/files"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/users"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/version"
 )
 
 const changeHint = "To make changes, open Vault on this computer with Super+Alt+V or `vaultctl open`."
@@ -113,11 +114,13 @@ type SessionResponse struct {
 	FilesSignedIn bool        `json:"files_signed_in"`
 	Demo          bool        `json:"demo,omitempty"`
 	Hint          string      `json:"hint,omitempty"`
+	// Version lets vaultctl notice an updated install and restart Vault.
+	Version string `json:"version"`
 }
 
 func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 	id, ok, _ := s.identity(r)
-	resp := SessionResponse{AccountsExist: s.accountsExist(), Demo: s.Demo}
+	resp := SessionResponse{AccountsExist: s.accountsExist(), Demo: s.Demo, Version: version.Version}
 	if ok {
 		resp.SignedIn = true
 		resp.Local = id.Local

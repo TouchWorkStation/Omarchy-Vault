@@ -25,6 +25,7 @@ import (
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/sysexec"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/version"
+	"golang.org/x/term"
 )
 
 const usage = `vaultctl — Omarchy Vault
@@ -163,6 +164,11 @@ func realMain(args []string) int {
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "vaultctl:", err)
+		// Started from a keyboard shortcut there is no terminal to read
+		// this, so show it on the desktop too.
+		if !term.IsTerminal(int(os.Stderr.Fd())) && hasDisplay() {
+			notify("Vault", err.Error())
+		}
 		return 1
 	}
 	return 0
