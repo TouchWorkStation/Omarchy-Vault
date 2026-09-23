@@ -120,8 +120,7 @@ func (a *app) doctor(ctx context.Context) int {
 		{"lsblk", "util-linux", "drive discovery", true, 1},
 		{"findmnt", "util-linux", "system drive detection", true, 1},
 		{"smartctl", "smartmontools", "drive health", false, 1},
-		{"mergerfs", "mergerfs", "combining drives", false, 7},
-		{"cloudflared", "cloudflared", "remote access", false, 6},
+		{"mergerfs", "mergerfs", "combining drives", false, 6},
 	}
 	for _, t := range tools {
 		if _, err := exec.LookPath(t.bin); err == nil {

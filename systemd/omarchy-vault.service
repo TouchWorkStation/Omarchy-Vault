@@ -2,7 +2,8 @@
 # Installed to ~/.config/systemd/user/ by scripts/install.sh.
 #
 # Vault runs only when you turn it on (vaultctl on, or opening Vault) and
-# stops when you turn it off (vaultctl off, or the dashboard). There is
+# stops when you turn it off (vaultctl off, or the dashboard), or by itself
+# after auto_off_minutes (default 15) with nothing to do. There is
 # deliberately no [Install] section, so it can never start by itself at
 # login or boot.
 [Unit]

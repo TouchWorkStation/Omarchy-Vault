@@ -17,8 +17,10 @@ import (
 // Download and share link limits.
 const (
 	maxDownloadCount = 10
-	maxShareMinutes  = 30 * 24 * 60
-	defaultShareMins = 24 * 60
+	// Share links are short-lived: while one is active the phone port is
+	// open and Vault stays on.
+	maxShareMinutes  = 24 * 60
+	defaultShareMins = 60
 	maxBrowseEntries = 5000
 )
 
@@ -251,7 +253,7 @@ func (s *Server) handleCreateDownload(w http.ResponseWriter, r *http.Request) {
 // ShareRequest is the body of POST /api/share.
 type ShareRequest struct {
 	Path string `json:"path"`
-	// Minutes until the link expires (default 24 h, at most 30 days).
+	// Minutes until the link expires (default 1 h, at most 24 h).
 	Minutes int `json:"minutes"`
 	// MaxDownloads limits downloads; 0 means unlimited until expiry.
 	MaxDownloads int    `json:"max_downloads"`

@@ -147,12 +147,12 @@ func (a *app) download(ctx context.Context, args []string) error {
 
 // share creates a read-only share link and prints it with its QR code.
 func (a *app) share(ctx context.Context, args []string) error {
-	target, minutes, count, askPassword := "", 24*60, 0, false
+	target, minutes, count, askPassword := "", 60, 0, false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--expires":
 			if i+1 >= len(args) {
-				return errors.New("--expires needs a duration such as 10m, 1h, 24h or 7d")
+				return errors.New("--expires needs a duration such as 10m, 1h or 24h")
 			}
 			m, err := parseExpiry(args[i+1])
 			if err != nil {
@@ -180,7 +180,7 @@ func (a *app) share(ctx context.Context, args []string) error {
 		}
 	}
 	if target == "" {
-		return errors.New("usage: vaultctl share <file or folder> [--expires 24h] [--downloads N] [--password]")
+		return errors.New("usage: vaultctl share <file or folder> [--expires 1h] [--downloads N] [--password]")
 	}
 	rel, err := a.vaultRel(target)
 	if err != nil {
@@ -213,13 +213,13 @@ func (a *app) share(ctx context.Context, args []string) error {
 	}
 	fmt.Fprintf(a.out, "SHARE LINK  ·  read only\n\n%s\n%s\n\n", qr, link.URL)
 	fmt.Fprintf(a.out, "%s  ·  %s  ·  valid until %s\n", link.Path, limit, link.ExpiresAt.Local().Format("Mon 2 Jan 15:04"))
-	fmt.Fprintln(a.out, "Works on this network while Vault is on. Stop it any time in Vault › Download › Share links.")
+	fmt.Fprintln(a.out, "Works on this Wi-Fi while Vault is on. Stop it any time in Vault › Download › Share links.")
 	return nil
 }
 
-// parseExpiry reads 10m, 1h, 24h, 7d (at most 30 days) into minutes.
+// parseExpiry reads 10m, 1h, 24h (at most 24 hours) into minutes.
 func parseExpiry(s string) (int, error) {
-	bad := errors.New("--expires must look like 10m, 1h, 24h or 7d (at most 30d)")
+	bad := errors.New("--expires must look like 10m, 1h or 24h (at most 24h)")
 	if len(s) < 2 {
 		return 0, bad
 	}
@@ -236,7 +236,7 @@ func parseExpiry(s string) (int, error) {
 	default:
 		return 0, bad
 	}
-	if n > 30*24*60 {
+	if n > 24*60 {
 		return 0, bad
 	}
 	return n, nil

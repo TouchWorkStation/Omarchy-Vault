@@ -154,21 +154,11 @@ func TestCrossSiteWritesRefused(t *testing.T) {
 	}
 }
 
-func TestPlannedEndpointsAre501(t *testing.T) {
+func TestRemoteAccessIsGone(t *testing.T) {
 	h := testServer(t)
-	cases := map[string]string{
-		"/api/remote": "POST",
-	}
-	for p, m := range cases {
-		w := do(h, m, p, func(r *http.Request) { r.Header.Set("Origin", "http://127.0.0.1:8788") })
-		if w.Code != http.StatusNotImplemented {
-			t.Errorf("%s %s = %d", m, p, w.Code)
-			continue
-		}
-		var body map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &body)
-		if body["milestone"] == nil {
-			t.Errorf("%s %s missing milestone", m, p)
+	for _, m := range []string{"GET", "POST"} {
+		if w := do(h, m, "/api/remote", func(r *http.Request) { r.Header.Set("Origin", "http://127.0.0.1:8788") }); w.Code != http.StatusNotFound {
+			t.Errorf("%s /api/remote = %d", m, w.Code)
 		}
 	}
 }

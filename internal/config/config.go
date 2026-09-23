@@ -21,6 +21,9 @@ const CurrentVersion = 1
 // DefaultListen is the address vaultd binds to unless configured otherwise.
 const DefaultListen = "127.0.0.1:8788"
 
+// DefaultAutoOffMinutes is how long Vault stays on with nothing to do.
+const DefaultAutoOffMinutes = 15
+
 // DefaultVaultRoot is the logical Vault mount point.
 const DefaultVaultRoot = "/srv/vault"
 
@@ -32,10 +35,12 @@ type Config struct {
 	Sources     []Source    `json:"sources"`
 	Pool        Pool        `json:"pool"`
 	Preferences Preferences `json:"preferences"`
-	Remote      Remote      `json:"remote"`
-	Services    Services    `json:"services"`
-	Security    Security    `json:"security"`
-	Transfer    Transfer    `json:"transfer"`
+	// AutoOffMinutes turns Vault off after this long with nobody using
+	// the dashboard and no active phone link. 0 = never (not recommended).
+	AutoOffMinutes int      `json:"auto_off_minutes"`
+	Services       Services `json:"services"`
+	Security       Security `json:"security"`
+	Transfer       Transfer `json:"transfer"`
 }
 
 // Transfer configures how phones reach Vault for QR transfers. The
@@ -86,19 +91,10 @@ type Preferences struct {
 	DownloadMaxCount      int    `json:"download_max_count"`
 }
 
-// Remote holds remote access settings. Secrets are never stored here; the
-// tunnel token lives in a separate 0600 file (Milestone 6).
-type Remote struct {
-	Enabled  bool   `json:"enabled"`
-	Provider string `json:"provider,omitempty"`
-	Domain   string `json:"domain,omitempty"`
-}
-
 // Services lists optional integrations the user has turned on.
 type Services struct {
 	FileServer bool `json:"file_server"`
 	LANSharing bool `json:"lan_sharing"`
-	Tunnel     bool `json:"tunnel"`
 }
 
 // Security holds listener safety switches.
@@ -115,11 +111,12 @@ type Security struct {
 // Default returns the configuration used when no file exists.
 func Default() Config {
 	return Config{
-		Version:   CurrentVersion,
-		VaultRoot: DefaultVaultRoot,
-		Listen:    DefaultListen,
-		Sources:   []Source{},
-		Pool:      Pool{Mode: "none"},
+		Version:        CurrentVersion,
+		VaultRoot:      DefaultVaultRoot,
+		Listen:         DefaultListen,
+		Sources:        []Source{},
+		Pool:           Pool{Mode: "none"},
+		AutoOffMinutes: DefaultAutoOffMinutes,
 		Preferences: Preferences{
 			UploadFolder:          "Phone Uploads",
 			UploadExpiryMinutes:   10,
@@ -160,7 +157,7 @@ func Load(path string) (cfg Config, exists bool, err error) {
 	if err != nil {
 		return cfg, false, fmt.Errorf("config: read %s: %w", path, err)
 	}
-	dec := json.NewDecoder(strings.NewReader(string(data)))
+	dec := json.NewDecoder(strings.NewReader(string(dropLegacy(data))))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&cfg); err != nil {
 		return Default(), true, fmt.Errorf("config: parse %s: %w", path, err)
@@ -169,6 +166,36 @@ func Load(path string) (cfg Config, exists bool, err error) {
 		return Default(), true, err
 	}
 	return cfg, true, nil
+}
+
+// dropLegacy removes settings from older versions that no longer exist
+// (remote access through a tunnel was dropped: Vault is local only), so
+// their config files still load. Anything else unknown is still an error.
+func dropLegacy(data []byte) []byte {
+	var top map[string]json.RawMessage
+	if json.Unmarshal(data, &top) != nil {
+		return data // let the strict decoder report the problem
+	}
+	_, changed := top["remote"]
+	delete(top, "remote")
+	if raw, ok := top["services"]; ok {
+		var svc map[string]json.RawMessage
+		if json.Unmarshal(raw, &svc) == nil {
+			if _, ok := svc["tunnel"]; ok {
+				delete(svc, "tunnel")
+				top["services"], _ = json.Marshal(svc)
+				changed = true
+			}
+		}
+	}
+	if !changed {
+		return data
+	}
+	out, err := json.Marshal(top)
+	if err != nil {
+		return data
+	}
+	return out
 }
 
 // Validate checks the configuration for unsafe or inconsistent values.
@@ -226,6 +253,9 @@ func (c Config) Validate() error {
 		if ip := net.ParseIP(c.Transfer.Host); ip == nil || ip.IsLoopback() || ip.IsUnspecified() {
 			errs = append(errs, errors.New("transfer.host must be this computer's LAN IP address"))
 		}
+	}
+	if c.AutoOffMinutes != 0 && (c.AutoOffMinutes < 5 || c.AutoOffMinutes > 24*60) {
+		errs = append(errs, errors.New("auto_off_minutes must be 0 (never) or between 5 and 1440"))
 	}
 	if p.DownloadMaxCount < 0 {
 		errs = append(errs, errors.New("preferences.download_max_count must not be negative"))

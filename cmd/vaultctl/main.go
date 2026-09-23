@@ -53,13 +53,12 @@ Commands:
   users folders <name> "A,B:ro"  Change which folders they can open
   users remove <name> [--yes]  Delete the account (never their files)
   files           File service status and address
-  remote status   Remote access status
   upload [--folder NAME] [--minutes N] [--terminal]
                   Upload to Vault (Phone -> Vault): shows a QR code for your phone
   download [<file or folder>] [--minutes N] [--downloads N] [--terminal]
                   Download from Vault (Vault -> Phone): pick a file, get a QR code
-  share <file or folder> [--expires 24h] [--downloads N] [--password]
-                  Read-only share link (unlimited downloads unless --downloads)
+  share <file or folder> [--expires 1h] [--downloads N] [--password]
+                  Read-only share link on this Wi-Fi, up to 24h (unlimited downloads unless --downloads)
   shortcuts       Check Vault's shortcuts for conflicts
   shortcuts install [--use-suggestions] [--yes]
                   Add the free ones (never replaces an existing binding)
@@ -138,11 +137,6 @@ func realMain(args []string) int {
 			return fail("usage: vaultctl pool status")
 		}
 		err = a.poolStatus()
-	case "remote":
-		if len(cmdArgs) == 0 || cmdArgs[0] != "status" {
-			return fail("usage: vaultctl remote status")
-		}
-		err = a.remoteStatus()
 	case "users":
 		err = a.usersCmd(ctx, cmdArgs)
 	case "files":
@@ -241,10 +235,11 @@ func (a *app) status(ctx context.Context) error {
 		Setup     bool           `json:"setup_complete"`
 		Storage   storage.Status `json:"storage"`
 		Drives    *disks.Summary `json:"drives"`
-		Remote    struct {
-			State  string `json:"state"`
-			Domain string `json:"domain"`
-		} `json:"remote"`
+		Phone     struct {
+			ActiveLinks int  `json:"active_links"`
+			Listening   bool `json:"listening"`
+		} `json:"phone"`
+		AutoOff  int      `json:"auto_off_minutes"`
 		Warnings []string `json:"warnings"`
 	}
 	raw, _ := json.Marshal(st)
@@ -264,11 +259,16 @@ func (a *app) status(ctx context.Context) error {
 	if d := typed.Drives; d != nil {
 		row(w, "Drives", fmt.Sprintf("%d found · %d system (protected) · %d available", d.Total, d.System, d.Available))
 	}
-	remote := "not configured"
-	if typed.Remote.State != "not_configured" {
-		remote = typed.Remote.State + " " + typed.Remote.Domain
+	phone := "closed (no active code)"
+	if typed.Phone.Listening {
+		phone = fmt.Sprintf("open on Wi-Fi for %d active code(s)", typed.Phone.ActiveLinks)
 	}
-	row(w, "Remote", remote)
+	row(w, "Phone port", phone)
+	if typed.AutoOff > 0 {
+		row(w, "Auto-off", fmt.Sprintf("after %d minutes with nothing to do", typed.AutoOff))
+	} else {
+		row(w, "Auto-off", "never (auto_off_minutes is 0)")
+	}
 	for _, warn := range typed.Warnings {
 		fmt.Fprintln(w, "\n! "+warn)
 	}
@@ -303,20 +303,6 @@ func (a *app) poolStatus() error {
 			fmt.Fprintf(a.out, "  %s\n", s.Path)
 		}
 	}
-	return nil
-}
-
-func (a *app) remoteStatus() error {
-	r := a.cfg.Remote
-	if a.json {
-		return a.emitJSON(r)
-	}
-	if !r.Enabled {
-		fmt.Fprintln(a.out, "Remote access is off. Vault is only reachable from this computer.")
-		fmt.Fprintln(a.out, "Connecting your domain through Cloudflare arrives in Milestone 6.")
-		return nil
-	}
-	fmt.Fprintf(a.out, "Remote access: %s via %s\n", r.Domain, r.Provider)
 	return nil
 }
 

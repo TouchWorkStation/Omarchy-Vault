@@ -162,6 +162,9 @@ func (s *Server) Ensure() (string, error) {
 	return "http://" + s.addr, nil
 }
 
+// Busy reports whether a transfer is in progress.
+func (s *Server) Busy() bool { return s.inflight.Load() > 0 }
+
 // StopIfIdle closes the listener when no link is active and no upload is
 // still arriving.
 func (s *Server) StopIfIdle(ctx context.Context) {

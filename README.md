@@ -1,34 +1,39 @@
 # Omarchy Vault
 
-Turn unused storage in your Omarchy machine into a secure private cloud.
+Turn unused storage in your Omarchy machine into a private cloud for your home Wi-Fi.
 
-**Upload. Download. Backup. Anywhere.**
+**Press a shortcut. Scan the QR code. Done.**
 
 > Beam moves it.
 > Vault keeps it.
 
-Omarchy Vault keeps Omarchy as your operating system and adds the useful parts of a NAS on top: one place for your files, access from any browser, QR-code transfer to and from your phone, backups, secure share links, and optional remote access through your own domain.
+Omarchy Vault keeps Omarchy as your operating system and adds the useful parts of a NAS on top: one place for your files, a file browser, and QR-code transfer to and from your phone.
 
-It is **not** a replacement for TrueNAS, Unraid or ZimaOS. There is no separate NAS OS to install, and no RAID to configure. Vault uses the drives you already have, as they are, and hides the Linux plumbing (mounts, mergerfs, SFTPGo, Cloudflare Tunnel, systemd, permissions) behind simple actions.
+**Local only.** Everything happens on your own Wi-Fi. There is no cloud service, no tunnel, no VPN and no port opened on your router.
+
+**Only runs when you need it.** Vault never starts at login or boot. Pressing a shortcut turns it on, and it turns itself off again after 15 minutes with nothing to do.
+
+It is **not** a replacement for TrueNAS, Unraid or ZimaOS. Vault uses the drives you already have, as they are, and hides the Linux plumbing (mounts, SFTPGo, systemd, permissions) behind simple actions.
 
 | You do | Vault handles |
 |---|---|
-| Combine these drives into one Vault | mergerfs pool, non-destructive |
-| Create user | SFTPGo accounts, folders, permissions |
-| Connect your domain | cloudflared tunnel, TLS, service |
-| Upload to Vault | a short-lived, upload-only link and a QR code |
+| Pick a drive or folder in setup | safe adoption, system disk protection |
+| Press Super+Shift+U | a short-lived upload-only link and a QR code |
+| Press Super+Shift+D, pick a file | a short-lived download link and a QR code |
+| Create a user for family | SFTPGo accounts, folders, permissions |
 
 ![Vault dashboard](docs/screenshots/dashboard.png)
 
 ## Status
 
-**Milestones 1–5 of 7 are complete.** Vault protects your system disk, turns a mounted drive into your Vault, gives everyone in the house their own account and a file browser, and moves photos, videos and files between your phone and the Vault with a QR code, both ways. You can also hand out read-only share links. See [ROADMAP.md](ROADMAP.md).
+**Milestones 1–5 of 6 are complete.** Vault protects your system disk, turns a mounted drive into your Vault, gives everyone in the house their own account and a file browser, and moves photos, videos and files between your phone and the Vault with a QR code, both ways. See [ROADMAP.md](ROADMAP.md).
 
 | Works now | Coming |
 |---|---|
-| **Upload to Vault**: Super+Shift+U, scan the QR code, send photos/videos/files from your phone (M4) | Remote access through Cloudflare Tunnel (M6) |
-| **Download from Vault**: Super+Shift+D, pick a file or folder, scan, it downloads to your phone (M5) | Combining several drives, LAN sharing (M7) |
-| **Share links**: read only, expiring, download limits, optional password, stop any time (M5) | Backups (M8) |
+| **Upload to Vault**: Super+Shift+U, scan the QR code, send photos/videos/files from your phone (M4) | Combining several drives, drive health alerts (M6) |
+| **Download from Vault**: Super+Shift+D, pick a file or folder, scan, it downloads to your phone (M5) | |
+| **Share links** on your Wi-Fi: read only, up to 24 hours, download limits, optional password (M5) | |
+| Turns itself off after 15 minutes with nothing to do | |
 | First-run setup: choose a drive, create your admin account | |
 | **Files** in the browser: browse, upload, download, folders (M3) | |
 | **Users**: Admin / Family / Guest, per-folder read & write or read only (M3) | |
@@ -39,17 +44,16 @@ It is **not** a replacement for TrueNAS, Unraid or ZimaOS. There is no separate 
 
 **New here? Follow the [setup guide](docs/setup-guide.md)**: preparing a drive, installing, first-run, Files and users, step by step.
 
-## Features (planned for v0.1)
+## Features (v0.1)
 
-- **Storage**: use one drive, or combine several into one Vault. Existing filesystems only; nothing is formatted.
-- **Files**: browse, upload and download from any browser. SFTP/WebDAV for power users (off by default).
+- **Storage**: use one drive or a folder on it (combining several drives comes in M6). Existing filesystems only; nothing is formatted.
 - **Upload to Vault** (`Super + Shift + U`): scan a QR code with your phone, pick photos, videos or files. They land in `Phone Uploads`.
 - **Download from Vault** (`Super + Shift + D`): pick a file or folder, scan the QR code, it downloads to your phone.
-- **Share links**: read-only, expiring, optionally password-protected, revocable.
+- **Share links**: read only, on your Wi-Fi, up to 24 hours, optional password, stop any time.
+- **Files**: browse, upload and download in the browser on this computer.
 - **Users**: Admin, Family, Guest; read/write or read-only per folder.
-- **Remote access**: your own domain through Cloudflare Tunnel. Vault is never exposed directly.
-- **Backups**: copy computer folders into `Backups/<hostname>/` with rsync.
 - **Drive health**: SMART status, temperature, power-on hours, reallocated sectors. Errors are never hidden.
+- **Light**: nothing runs until you use it; it turns itself off after 15 idle minutes.
 
 ## Quick start
 
@@ -91,10 +95,10 @@ Developing? See [docs/development.md](docs/development.md).
                        │  REST API + embedded React UI    lsblk · findmnt · smartctl · hyprctl
                        │
  vaultctl (CLI) ───────┤  SFTPGo (Files, per-user folders) · later: mergerfs (pooling)
- Omarchy plugin (QML) ─┘         cloudflared (remote) · privileged helper (narrow, allowlisted)
+ Omarchy plugin (QML) ─┘  phone listener (LAN, port 8790, only while a QR code is active)
 ```
 
-One Go binary serves the API and the dashboard, and supervises SFTPGo (the file engine) as a child process on 127.0.0.1:8789, reachable only through Vault's sign-in at `/files/`. SQLite (from Milestone 4) holds tokens, shares and activity, never files. Details: [ARCHITECTURE.md](ARCHITECTURE.md).
+One Go binary serves the API and the dashboard, and supervises SFTPGo (the file engine) as a child process on 127.0.0.1:8789, reachable only through Vault's sign-in at `/files/`. SQLite holds hashed link tokens and transfer activity, never files. Details: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Safety model
 
@@ -103,7 +107,8 @@ One Go binary serves the API and the dashboard, and supervises SFTPGo (the file 
 - **Unplugged drives can't fill your system disk.** Vault checks the drive's UUID and the kernel mount table before every use. If the drive is gone, the Vault shows as offline instead of writing into an empty folder.
 - **Adopting a drive only adds folders.** Existing files are never moved, renamed or deleted. "Stop using this drive" only forgets it.
 - **Accounts done carefully.** Passwords are argon2id hashes, sign-in locks out after repeated failures, two-factor is optional, and disabling someone signs them out immediately. Family and guests only see the folders you give them.
-- **Local by default.** The service binds to `127.0.0.1` and rejects unknown `Host` headers (DNS-rebinding protection). SFTP and WebDAV are off. Remote access is opt-in and goes through a tunnel.
+- **Local only.** The dashboard binds to `127.0.0.1` and rejects unknown `Host` headers (DNS-rebinding protection). Phones reach only a separate transfer port on your Wi-Fi, and only while a QR code or share link is active. No tunnel, no VPN, no router ports. SFTP and WebDAV are off.
+- **Short-lived.** Vault runs only after you turn it on, and turns itself off after 15 minutes with nothing to do (`auto_off_minutes`).
 - **No shell from the web.** There is no command-execution endpoint. Vault runs a short allowlist of read-only tools, without a shell.
 - **Shortcuts are never overwritten.** Conflicts are reported with options: choose another, copy the binding, or skip.
 
@@ -144,8 +149,9 @@ Screenshots use `--demo` data.
 3. ✅ SFTPGo files and users
 4. ✅ Upload to Vault (Super+Shift+U), QR, mobile upload page
 5. ✅ Download from Vault (Super+Shift+D), file picker, mobile download page, share links
-6. Remote access through Cloudflare Tunnel
-7. Combining drives with mergerfs, SMART monitoring, optional LAN sharing
+6. Combining drives with mergerfs, SMART monitoring, optional LAN sharing
+
+Not planned: remote access from outside your home (Cloudflare, VPN) and automatic backups. Vault is deliberately local and short-lived.
 
 Details in [ROADMAP.md](ROADMAP.md).
 

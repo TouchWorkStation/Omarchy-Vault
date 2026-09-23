@@ -215,6 +215,7 @@ func run() error {
 	workers := make(chan struct{})
 	go func() { fileMgr.Run(ctx); close(workers) }()
 	go srv.RunMonitor(ctx, 20*time.Second)
+	go srv.RunAutoOff(ctx, 30*time.Second)
 	defer func() { stop(); <-workers }()
 
 	errCh := make(chan error, 1)

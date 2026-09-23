@@ -205,7 +205,8 @@ export interface Status {
   drives: DriveSummary | null;
   drives_error?: string;
   system_disk_detected: boolean;
-  remote: { enabled: boolean; domain?: string; state: string; milestone: number };
+  phone: { active_links: number; listening: boolean };
+  auto_off_minutes: number;
   users: { count: number };
   files: FilesStatus;
   services: Service[];
@@ -252,7 +253,6 @@ export interface SettingsResponse {
       download_expiry_minutes: number;
       download_max_count: number;
     };
-    remote: { enabled: boolean; provider?: string; domain?: string };
   };
   config_found: boolean;
   config_error?: string;

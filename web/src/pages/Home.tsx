@@ -125,9 +125,9 @@ export function Home() {
         <div className="tile">{driveTile(s)}</div>
         <div className="tile">
           <Stat
-            label="Remote Access"
-            value={s.remote.state === "not_configured" ? "Off" : s.remote.state}
-            sub={s.remote.domain ?? "Local only"}
+            label="Phone"
+            value={s.phone.listening ? `${s.phone.active_links} active` : "Closed"}
+            sub={`Same Wi-Fi only · auto-off ${s.auto_off_minutes > 0 ? `after ${s.auto_off_minutes} min` : "never"}`}
           />
         </div>
         <div className="tile">

@@ -224,6 +224,8 @@ vaultctl doctor
 
 Vault only runs when you turn it on. Nothing starts at login or boot, and nothing stays in the background after you turn it off.
 
+It also **turns itself off** after 15 minutes with nothing to do: nobody using the dashboard, no QR code or share link active and nothing being transferred. The shortcuts turn it on again in a second or two. To change the time, set `"auto_off_minutes"` in `~/.config/omarchy-vault/config.json` (5 to 1440 minutes, or `0` for never), then `vaultctl off && vaultctl on`.
+
 ```sh
 vaultctl on        # turn on (Files starts too, once your drive is ready)
 vaultctl off       # turn off (stops Files too)
@@ -238,14 +240,13 @@ Opening Vault turns it on for you: `vaultctl open`, `vaultctl setup`, or the Sup
 vaultctl setup
 ```
 
-Your browser opens, already signed in as this computer's owner. The six screens:
+Your browser opens, already signed in as this computer's owner. The five screens:
 
 1. **Welcome.** Click Get Started.
 2. **Storage.** Your drives. The system drive shows SYSTEM · Protected and can't be picked. Choose your Vault drive and click Select Drive.
 3. **Vault Storage.** Choose "A Vault folder" (recommended: creates `Vault` on the drive and leaves your other files alone) or "The whole drive". Keep "Create folders" on for Photos, Documents, Backups, Projects, Phone Uploads and Shared. Click **Create Vault**.
 4. **Account.** Create your admin account (username + password, 10+ characters). You'll use it to sign in to Vault and Files. You can set up two-factor later in Account.
-5. **Remote Access.** Click Skip for now (arrives in Milestone 6).
-6. **Your Vault is ready.** Shows your free space. **Open Files** takes you straight to your files.
+5. **Your Vault is ready.** Shows your free space. **Open Files** takes you straight to your files.
 
 ### The same from the terminal
 
@@ -282,7 +283,7 @@ Files is your Vault in the browser: browse, upload, download (folders as zip), c
 - **Admins** see every folder. **Family** sees only their folders (read & write, or read only per folder). **Guests** see only their folders, always read only.
 - Uploads go straight to the drive. There is no size limit other than free space.
 
-In this version, Vault's pages (and Files) are reachable **from this computer only**. Reaching Vault from phones and other computers arrives with Remote Access (Milestone 6), which adds encryption (TLS). Until then, please don't open Vault to your network by changing `listen`.
+Vault's pages (and Files) are reachable **from this computer only**. Phones use the QR codes (sections 8 and 9) instead. Please don't open the dashboard to your network by changing `listen`.
 
 If Files says it is not installed, run `./scripts/build-sftpgo.sh` (or re-run the installer), then `vaultctl off && vaultctl on`.
 
@@ -385,7 +386,7 @@ In a terminal only? `vaultctl upload --terminal` prints the QR code in the termi
 - Vault stops accepting files before your drive is completely full (it keeps 1 GB free).
 - Family members can create codes for folders they can write; guests can't.
 - Each code works for one folder, can't be used to see or download anything, and ends when it expires, when you click Stop, or after 1000 files.
-- Use it on your own Wi-Fi, not on public Wi-Fi: on the local network the upload is not encrypted (it is once remote access arrives in Milestone 6).
+- Use it on your own Wi-Fi, not on public Wi-Fi: on the local network the upload is not encrypted.
 - Phone not connecting? See Troubleshooting.
 
 ---
@@ -407,17 +408,17 @@ An interrupted download can be retried from the same phone until the code expire
 
 **Share links**
 
-For sending something to someone else (on your network for now; over the internet once remote access arrives in Milestone 6):
+For sending something to someone else on the same Wi-Fi (a family member's phone or laptop):
 
 1. In **Download**, choose the file or folder, then **Share link**.
-2. Pick how long it works (10 minutes to 30 days), how many downloads (one, up to 5, up to 25, or unlimited until it expires) and, if you like, a password.
+2. Pick how long it works (10 minutes, 1 hour, 4 hours or 24 hours), how many downloads (one, up to 5, up to 25, or unlimited until it expires) and, if you like, a password.
 3. **Create share link** shows a QR code and the link with a **Copy** button.
 
-Share links are read only: people can download, never change or delete. A shared folder shows its files one by one and as **Download all (.zip)**. All your active links are listed under **Download → Share links**, with **Stop** to end one immediately. From a terminal: `vaultctl share Photos/2024 --expires 7d --downloads 5 --password`.
+Share links are read only: people can download, never change or delete. A shared folder shows its files one by one and as **Download all (.zip)**. All your active links are listed under **Download → Share links**, with **Stop** to end one immediately. From a terminal: `vaultctl share Photos/2024 --expires 4h --downloads 5 --password`.
 
 Who can do what: admins everything; family members can send and share from folders they can open; guests can send to their own phone but can't create share links.
 
-While a share link is active Vault keeps its phone port open (only for that link's page), so stop shares you no longer need.
+While a share link is active Vault stays on and keeps its phone port open (only for that link's page), so stop shares you no longer need. Links never work from outside your home network.
 
 ---
 
@@ -459,7 +460,7 @@ vaultctl logs -f        # live log of the Vault service
 | Forgot the admin password | On this computer: `vaultctl users reset-password <name>` (the terminal is trusted as the owner) |
 | Locked out after wrong passwords | Wait 1–15 minutes, or reset the password from the terminal |
 | "That sign-in link expired" | Open Vault again with `vaultctl open` (links from it work once, for 30 seconds) |
-| "Vault is off" | That's the default. Turn it on with `vaultctl on` or open it with `vaultctl open` |
+| "Vault is off" | That's the default, and Vault turns itself off after 15 idle minutes. Turn it on with `vaultctl on`, a shortcut, or `vaultctl open` |
 | Phone says "can't connect" / page never loads | Phone on the same Wi-Fi (not mobile data, not a guest network)? Firewall rule from section 8 added? Some routers isolate Wi-Fi devices ("AP/client isolation"); turn that off for your home network |
 | "Your phone can't reach this computer: not connected to a local network" | The computer has no private network address (e.g. only a VPN). Connect to your home Wi-Fi/Ethernet, or set `"transfer": {"host": "<your LAN IP>"}` in `~/.config/omarchy-vault/config.json` |
 | "port 8790 is in use by another program" | Set another port: `"transfer": {"port": 8791}` in config.json (and allow it in ufw) |

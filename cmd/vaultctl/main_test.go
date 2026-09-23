@@ -24,7 +24,7 @@ func TestHumanBytes(t *testing.T) {
 
 func TestBadTransferArgsChangeNothing(t *testing.T) {
 	// Rejected before Vault is contacted or turned on.
-	for _, args := range [][]string{{"share"}, {"share", "x", "--expires", "90d"}, {"download", "--minutes", "99"}, {"upload", "--minutes", "0"}} {
+	for _, args := range [][]string{{"share"}, {"share", "x", "--expires", "2d"}, {"download", "--minutes", "99"}, {"upload", "--minutes", "0"}} {
 		if code := realMain(args); code != 1 {
 			t.Errorf("%v exit = %d, want 1", args, code)
 		}
@@ -52,12 +52,12 @@ func TestParseFolders(t *testing.T) {
 }
 
 func TestParseExpiry(t *testing.T) {
-	for in, want := range map[string]int{"10m": 10, "1h": 60, "24h": 1440, "7d": 10080, "30d": 43200} {
+	for in, want := range map[string]int{"10m": 10, "1h": 60, "24h": 1440, "1d": 1440} {
 		if got, err := parseExpiry(in); err != nil || got != want {
 			t.Errorf("parseExpiry(%q) = %d %v", in, got, err)
 		}
 	}
-	for _, bad := range []string{"", "m", "0h", "31d", "5x", "-1h"} {
+	for _, bad := range []string{"", "m", "0h", "25h", "7d", "5x", "-1h"} {
 		if _, err := parseExpiry(bad); err == nil {
 			t.Errorf("parseExpiry(%q) accepted", bad)
 		}

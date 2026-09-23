@@ -89,7 +89,7 @@ function SendPanel({ item, canShare }: { item: BrowseEntry; canShare: boolean })
   const [mode, setMode] = useState<"phone" | "share">("phone");
   const [minutes, setMinutes] = useState(10);
   const [count, setCount] = useState(1);
-  const [shareMinutes, setShareMinutes] = useState(24 * 60);
+  const [shareMinutes, setShareMinutes] = useState(60);
   const [shareCount, setShareCount] = useState(0);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -160,9 +160,8 @@ function SendPanel({ item, canShare }: { item: BrowseEntry; canShare: boolean })
               <select value={shareMinutes} onChange={(e) => setShareMinutes(Number(e.target.value))}>
                 <option value={10}>10 minutes</option>
                 <option value={60}>1 hour</option>
+                <option value={4 * 60}>4 hours</option>
                 <option value={24 * 60}>24 hours</option>
-                <option value={7 * 24 * 60}>7 days</option>
-                <option value={30 * 24 * 60}>30 days</option>
               </select>
             </label>
             <label className="field">
@@ -179,7 +178,7 @@ function SendPanel({ item, canShare }: { item: BrowseEntry; canShare: boolean })
             <span>Password (optional)</span>
             <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Leave empty for no password" />
           </label>
-          <p className="muted small">Read only: people with the link can download, never change or delete. Works on your network while Vault is on.</p>
+          <p className="muted small">Read only: people with the link can download, never change or delete. Works on this Wi-Fi only, while Vault is on.</p>
         </>
       )}
       {error && <Notice tone="bad">{error}</Notice>}

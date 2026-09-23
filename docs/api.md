@@ -13,7 +13,7 @@ Authentication is one of:
 
 | Endpoint group | Before the first account | After |
 |---|---|---|
-| `GET` status, storage, remote, files | open on loopback | any signed-in user |
+| `GET` status, storage, files | open on loopback | any signed-in user |
 | `GET` disks, settings, shortcuts, services, users | open on loopback | admins |
 | Writes (pool, users, account) | local token | admins (account: any signed-in user) |
 
@@ -42,7 +42,8 @@ Dashboard summary.
   "drives": { "total": 7, "system": 1, "available": 2, "unmounted": 1, "unsupported": 3,
               "healthy": 2, "warning": 1, "critical": 0, "unknown": 4 },
   "system_disk_detected": true,
-  "remote": { "enabled": false, "state": "not_configured", "milestone": 6 },
+  "phone": { "active_links": 0, "listening": false },
+  "auto_off_minutes": 15,
   "users": { "count": null, "milestone": 3 },
   "services": [ { "id": "smartctl", "name": "Drive health", "installed": true, "milestone": 1, "…": "…" } ],
   "shortcuts": [ { "id": "upload", "label": "Upload to Vault", "combo": "Super + Shift + U", "status": "available" } ],
@@ -120,7 +121,7 @@ Use one mounted drive as the Vault.
 - `folder`: omitted means `"Vault"`; `""` means the whole drive; up to four plain path components.
 - `create_folders`: default `true`. Creates Photos, Documents, Backups, Projects, Phone Uploads, Shared if missing.
 - `replace`: required when storage is already set up. Old files stay where they are.
-- `mode`: `"single"` (default). `"combined"` returns `501` until Milestone 7.
+- `mode`: `"single"` (default). `"combined"` returns `501` until Milestone 6.
 
 Response: `{ "storage": <GET /api/storage without candidates>, "result": { "data_dir", "created": [], "existing": [], "skipped": [] }, "notes": [] }`.
 
@@ -198,10 +199,6 @@ Shortcut plan and conflict analysis. See [shortcuts.md](shortcuts.md).
 
 Which supporting tools and units are present (read-only).
 
-### `GET /api/remote`
-
-`{ "enabled": false, "state": "not_configured", "milestone": 6 }`
-
 ### Upload to Vault (signed in; admin, or family into a folder they can write)
 
 #### `POST /api/upload-session`
@@ -241,7 +238,7 @@ Errors: `404 not_found` (no such file, or not yours to read), `400 not_plain` (a
 
 #### `POST /api/share` (admin, or family for folders they can open)
 
-Body: `{ "path": "Photos/2024", "minutes": 1440, "max_downloads": 0, "password": "" }`. `minutes` up to 43 200 (30 days, default 24 h); `max_downloads` 0 = unlimited until expiry; `password` optional (account password rules). Returns a link view with `kind: "share"`, `has_password` and a `/s/<token>` URL. The password and its hash are never returned.
+Body: `{ "path": "Photos/2024", "minutes": 60, "max_downloads": 0, "password": "" }`. `minutes` up to 1440 (24 h, default 1 h); `max_downloads` 0 = unlimited until expiry; `password` optional (account password rules). Returns a link view with `kind: "share"`, `has_password` and a `/s/<token>` URL. The password and its hash are never returned.
 
 #### Listing and stopping
 
@@ -274,18 +271,7 @@ For downloads and shares `files`/`max_files` count downloads, and `received` lis
 
 ### Power
 
-`POST /api/power/off` (admin): stops Vault (the dashboard's "Turn off Vault" button). `vaultctl off` does the same through systemd.
-
-## Planned (respond `501` today)
-
-Each returns `{ "error": "not_implemented", "message": "…", "milestone": N }`.
-
-| Method | Path | Milestone |
-|---|---|---|
-| POST | `/api/download-session` | 5 |
-| POST | `/api/share` | 5 |
-| DELETE | `/api/share/{id}` | 5 |
-| POST | `/api/remote` | 6 |
+`POST /api/power/off` (admin): stops Vault (the dashboard's "Turn off Vault" button). `vaultctl off` does the same through systemd. Vault also stops by itself after `auto_off_minutes` (default 15) with no API use, no active link and no transfer in progress.
 
 ### Beam integration
 

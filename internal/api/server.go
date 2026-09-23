@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -73,6 +72,8 @@ type Server struct {
 	links liveLinks
 	// writeMu serialises storage changes.
 	writeMu sync.Mutex
+
+	used activity // last dashboard/API use, for auto-off
 }
 
 func (s *Server) config() config.Config {
@@ -132,7 +133,6 @@ func (s *Server) Handler() http.Handler {
 	// Any signed-in user (open on loopback until the first account exists).
 	route("GET", "status", s.gate(user, s.handleStatus))
 	route("GET", "storage", s.gate(user, s.handleStorage))
-	route("GET", "remote", s.gate(user, s.handleRemote))
 	route("GET", "files", s.gate(user, s.handleFilesStatus))
 	route("POST", "account/password", s.gate(user, s.handleChangePassword))
 	route("POST", "account/totp/setup", s.gate(user, s.handleTOTPSetup))
@@ -187,21 +187,6 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle(files.WebRoot+"/", s.filesProxy())
 	mux.Handle("GET "+files.WebRoot, static)
 
-	for _, p := range planned {
-		p := p
-		h := func(w http.ResponseWriter, _ *http.Request) {
-			writeJSON(w, http.StatusNotImplemented, map[string]any{
-				"error":     "not_implemented",
-				"message":   p.feature + " arrives in Milestone " + strconv.Itoa(p.milestone) + ".",
-				"milestone": p.milestone,
-			})
-		}
-		mux.HandleFunc(p.method+" /api/"+p.path, h)
-		if !strings.HasPrefix(p.path, "v1/") {
-			mux.HandleFunc(p.method+" /api/v1/"+p.path, h)
-		}
-	}
-
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		if known[r.URL.Path] {
 			w.Header().Set("Allow", "GET, HEAD")
@@ -213,29 +198,16 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/", static)
 
 	extraHosts := append([]string{}, s.Config.Security.AllowedHosts...)
-	if s.Config.Remote.Domain != "" {
-		extraHosts = append(extraHosts, s.Config.Remote.Domain)
-	}
 
 	var h http.Handler = mux
 	h = limitBody(h)
 	h = newRateLimiter(20, 60).wrap(h)
 	h = newHostGuard(extraHosts).wrap(h)
 	h = securityHeaders(h)
+	h = s.trackActivity(h)
 	h = logRequests(s.Log, h)
 	h = recoverPanics(s.Log, h)
 	return h
-}
-
-type plannedEndpoint struct {
-	method, path, feature string
-	milestone             int
-}
-
-// planned lists API endpoints that exist in the design but are delivered by
-// later milestones.
-var planned = []plannedEndpoint{
-	{"POST", "remote", "Remote access", 6},
 }
 
 // StatusResponse is returned by GET /api/status.
@@ -252,7 +224,8 @@ type StatusResponse struct {
 	Drives        *disks.Summary        `json:"drives"`
 	DrivesError   string                `json:"drives_error,omitempty"`
 	SystemDisk    bool                  `json:"system_disk_detected"`
-	Remote        RemoteStatus          `json:"remote"`
+	Phone         PhoneStatus           `json:"phone"`
+	AutoOff       int                   `json:"auto_off_minutes"`
 	Users         UsersStatus           `json:"users"`
 	Services      []services.Component  `json:"services"`
 	Files         files.Status          `json:"files"`
@@ -260,13 +233,10 @@ type StatusResponse struct {
 	Warnings      []string              `json:"warnings,omitempty"`
 }
 
-// RemoteStatus summarises remote access.
-type RemoteStatus struct {
-	Enabled   bool   `json:"enabled"`
-	Provider  string `json:"provider,omitempty"`
-	Domain    string `json:"domain,omitempty"`
-	State     string `json:"state"`
-	Milestone int    `json:"milestone"`
+// PhoneStatus says whether phones can reach Vault right now.
+type PhoneStatus struct {
+	ActiveLinks int  `json:"active_links"`
+	Listening   bool `json:"listening"`
 }
 
 // UsersStatus summarises user accounts.
@@ -309,7 +279,8 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Listen:        s.config().Listen,
 		SetupComplete: st.Configured,
 		Storage:       st,
-		Remote:        s.remoteStatus(),
+		Phone:         s.phoneStatus(ctx),
+		AutoOff:       s.config().AutoOffMinutes,
 		Users:         s.usersStatus(),
 		Services:      s.servicesStatus(ctx),
 	}
@@ -431,19 +402,15 @@ func (s *Server) servicesStatus(ctx context.Context) []services.Component {
 	return comps
 }
 
-func (s *Server) remoteStatus() RemoteStatus {
-	c := s.config()
-	rs := RemoteStatus{Enabled: c.Remote.Enabled, Provider: c.Remote.Provider, Domain: c.Remote.Domain, Milestone: 6}
-	if rs.Enabled {
-		rs.State = "unknown"
-	} else {
-		rs.State = "not_configured"
+func (s *Server) phoneStatus(ctx context.Context) PhoneStatus {
+	var ps PhoneStatus
+	if s.Transfers != nil {
+		if active, err := s.Transfers.Active(ctx); err == nil {
+			ps.ActiveLinks = len(active)
+		}
 	}
-	return rs
-}
-
-func (s *Server) handleRemote(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.remoteStatus())
+	ps.Listening = s.Transfer != nil && s.Transfer.Running() != ""
+	return ps
 }
 
 func (s *Server) staticHandler() http.Handler {

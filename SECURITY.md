@@ -10,7 +10,7 @@ Vault stores private files. Security and data safety come before features.
 
 1. The user's files in the Vault and on attached drives.
 2. The operating system disk and its data.
-3. Credentials: user passwords, TOTP secrets, SFTPGo admin credentials, Cloudflare tunnel token.
+3. Credentials: user passwords, TOTP secrets, SFTPGo admin credentials, the local owner token.
 4. Transfer and share tokens.
 5. The integrity of the user's desktop configuration (Hyprland bindings, systemd units).
 
@@ -19,22 +19,22 @@ Vault stores private files. Security and data safety come before features.
 | Adversary | Example | Primary controls |
 |---|---|---|
 | Malicious website in the user's browser | DNS rebinding to 127.0.0.1, cross-site POST | Host allowlist, Origin / Sec-Fetch-Site checks, SameSite cookies, CSP |
-| Someone on the LAN | Scanning for open services | Loopback bind by default; SMB/SFTP off by default |
-| Someone on the internet | Probing `vault.example.com` | Tunnel only, auth + 2FA, rate limits, no directory listing without auth |
+| Someone on the LAN | Scanning for open services | Dashboard on loopback only; the phone port exists only while a link is active and serves only token pages; SMB/SFTP off |
+| Someone on the internet | Probing for the machine | Nothing is exposed: no tunnel, no VPN, no router ports. The phone port binds to the private LAN address only |
 | Holder of a leaked QR/share link | Photo of a screen, forwarded message | Short expiry, single scope, max uses, revocation, read-only/upload-only |
 | Authenticated but limited user (Guest) | Reading another user's folder | SFTPGo per-user virtual folders and permissions, path validation |
 | Buggy Vault code | Wrong disk chosen, path traversal | Read-only M1, fail-safe system disk detection, no formatting ever, tests |
 
 ### Out of scope
 
-A root-level attacker on the machine, physical theft of unencrypted drives (use LUKS), and compromise of Cloudflare itself.
+A root-level attacker on the machine, physical theft of unencrypted drives (use LUKS), and an attacker who controls your Wi-Fi (the phone port is plain HTTP; see "The phone listener").
 
 ## Trust boundaries
 
 ```
- Internet ──(Cloudflare Tunnel, TLS)──┐
- LAN (off by default) ────────────────┤
- Browser on this machine ─────────────┼──► vaultd (user)  ──► privileged helper (root, allowlist)
+ Phone on the same Wi-Fi ──► phone listener (LAN:8790, only while a link is active, token pages only)
+                                              │
+ Browser on this machine ─────────────┬──► vaultd (user)  ──► privileged helper (root, allowlist)
  vaultctl / plugin / Beam ────────────┘       │                     │
                                               ▼                     ▼
                                        user's files          mounts, services, SMART
@@ -44,7 +44,7 @@ A root-level attacker on the machine, physical theft of unencrypted drives (use 
 2. **vaultd → system.** vaultd runs as the desktop user and can only execute an allowlisted set of binaries (`internal/sysexec`): `lsblk`, `findmnt`, `blkid`, `smartctl`, `hyprctl`, `systemctl`. No shell is ever used. Arguments are fixed in code; the only discovered value passed as an argument (a device path for `smartctl`) must match `^/dev/[a-z0-9_-]+$`.
 3. **Other local users → vaultd.** Anyone on the machine can reach `127.0.0.1:8788`. Before the first account exists they can only read; afterwards they need a Vault account (see "Accounts and sign-in").
 4. **vaultd → SFTPGo.** A child process on 127.0.0.1:8789, managed through its admin REST API (see "File service trust boundary").
-5. **vaultd → privileged helper** (planned, Milestone 7). See below.
+5. **vaultd → privileged helper** (planned, Milestone 6). See below.
 
 ## Off by default
 
@@ -115,7 +115,7 @@ It exposes a fixed set of operations, each with validated, typed arguments:
 | `smart_status(device)` | device must exist in the current lsblk inventory |
 | `mount_pool(sources)` | each source must be an adoptable mounted volume, not on the system disk |
 | `unmount_pool()` | only Vault's own pool mount |
-| `service_status(name)` / `enable_service(name)` | name from a fixed list: `sftpgo`, `cloudflared`, `smb` |
+| `service_status(name)` / `enable_service(name)` | name from a fixed list: `sftpgo`, `smb` |
 
 Forbidden, permanently: `exec(command)`, `run_shell(command)`, arbitrary paths, arbitrary unit names, formatting, partitioning, `wipefs`, `mkfs`, `dd`, `fdisk`/`parted`, editing `/etc/fstab` outside a Vault-owned, clearly marked block.
 
@@ -131,7 +131,7 @@ Uploads since Milestone 4; downloads and share links since Milestone 5.
 - Wrong tokens count towards the same lockout as passwords (per phone IP, 1 → 15 minutes).
 - Download tokens: one file or folder; default 10 minutes and 1 download (at most 60 minutes and 10 downloads); Stop at any time.
 - A download is counted once per phone (network address) and file, when the transfer starts. The same phone can resume or retry an interrupted download until the link expires without using it up; another phone cannot. Counting is by address because phones have no account; two phones behind one address (unusual on home Wi-Fi) count as one.
-- Share links: read only, always; 10 minutes to 30 days; one, limited or unlimited downloads until expiry; optional password; Stop at any time. Only admins, and family members for folders they can open, can create one; guests cannot.
+- Share links: read only, always; 10 minutes to 24 hours (default 1 hour); one, limited or unlimited downloads until expiry; optional password; Stop at any time. Only admins, and family members for folders they can open, can create one; guests cannot.
 - Share passwords are stored as argon2id hashes and follow the account password rules. Wrong guesses count towards a per-address lockout (1 → 15 minutes). A correct password gives an HttpOnly, SameSite=Lax cookie scoped to that one link's path, valid for at most 12 hours and never longer than the link; grants live in memory only.
 - What a link can reach: exactly the file or folder it names, resolved inside the Vault through `os.Root`. Every path element is checked with `lstat` and a symlink anywhere is refused; files are opened with `O_NOFOLLOW`. Inside a shared folder, symlinks, special files and unfinished uploads are neither listed nor zipped, and a sub-path can never leave the folder (`..` is rejected).
 - Pages served to phones never contain filesystem paths, only names relative to what was shared.
@@ -140,10 +140,10 @@ Uploads since Milestone 4; downloads and share links since Milestone 5.
 
 ### The phone listener (Milestone 4)
 
-Phones can't reach the dashboard (it listens on 127.0.0.1 only). While at least one link (upload, download or share) is active, Vault opens a **second, separate** listener on your LAN address, port 8790. It serves only pages for a valid token (`/u/<token>` upload, `/d/<token>` download, `/s/<token>` share) and static page assets. No dashboard, no API, no Files, and no browsing beyond what one link names. It closes as soon as the last link expires, is used up or is stopped (checked every 30 seconds; a transfer still in progress finishes first), and it never runs while Vault is off. Note that a share link keeps it open for as long as the share lasts (up to 30 days while Vault is on); stop shares you no longer need.
+Phones can't reach the dashboard (it listens on 127.0.0.1 only). While at least one link (upload, download or share) is active, Vault opens a **second, separate** listener on your LAN address, port 8790. It serves only pages for a valid token (`/u/<token>` upload, `/d/<token>` download, `/s/<token>` share) and static page assets. No dashboard, no API, no Files, and no browsing beyond what one link names. It closes as soon as the last link expires, is used up or is stopped (checked every 30 seconds; a transfer still in progress finishes first), and it never runs while Vault is off. A share link keeps it open for as long as the share lasts (at most 24 hours, and only while Vault is on); stop shares you no longer need.
 
 - It binds to one address, never `0.0.0.0`: the private LAN address it detects, or the IP you set as `transfer.host` in config (loopback and `0.0.0.0` are refused). If no private network address is found, no link is created.
-- **Plain HTTP.** On your own Wi-Fi this is like any home device; someone on the same network who can capture traffic could see the token and the files. Don't use transfer or share links on untrusted Wi-Fi (cafés, hotels). HTTPS arrives with remote access (Milestone 6).
+- **Plain HTTP.** On your own Wi-Fi this is like any home device; someone on the same network who can capture traffic could see the token and the files. Don't use transfer or share links on untrusted Wi-Fi (cafés, hotels).
 - Strict CSP (`default-src 'none'`, own scripts and styles only), `Referrer-Policy: no-referrer` (the token is in the URL), `no-store`, framing denied.
 - Files are streamed to a hidden `.vault-partial-*` file inside the destination folder and renamed into place with `RENAME_NOREPLACE`, so an existing file is never replaced; the folder is opened through `os.Root`, so a symlink can't redirect the write. Partial files are deleted on error.
 
@@ -152,9 +152,9 @@ Phones can't reach the dashboard (it listens on 127.0.0.1 only). While at least 
 Implemented in Milestone 1 (`internal/api/middleware.go`, tested):
 
 - **Host allowlist**: `localhost`, `127.0.0.1`, `::1`, plus configured domains. Others get 421. Blocks DNS rebinding.
-- **CSRF**: non-GET requests with a foreign `Origin`, or `Sec-Fetch-Site: cross-site`, are refused. When sessions arrive (M3), cookies are `HttpOnly`, `Secure` (over the tunnel), `SameSite=Strict`, and state-changing requests also require a CSRF token.
+- **CSRF**: non-GET requests with a foreign `Origin`, or `Sec-Fetch-Site: cross-site`, are refused. Session cookies are `HttpOnly` and `SameSite=Strict`, and cookie-authenticated writes also require the `X-Vault-Request` header.
 - **Headers**: strict CSP (`default-src 'self'`, no inline script, `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, restrictive `Permissions-Policy`, COOP/CORP same-origin, `Cache-Control: no-store` on the API.
-- **Rate limiting**: per-client token bucket on all requests; stricter limits for login and token endpoints from M3/M4. Behind the tunnel, the client IP comes from `CF-Connecting-IP` only when the request arrives from the local cloudflared.
+- **Rate limiting**: per-client token bucket on all requests; stricter limits for login and token endpoints from M3/M4.
 - **Limits**: 1 MB API bodies, 64 KB headers, read/write timeouts.
 - **Static files** are served from the embedded build only; there is no path from a URL to the host filesystem.
 
@@ -166,12 +166,11 @@ Authentication (M3) is described in "Accounts and sign-in" above.
 - Final paths are checked after resolving symlinks (`openat2` with `RESOLVE_BENEATH` where available, `filepath.EvalSymlinks` + prefix check otherwise) to prevent symlink escapes.
 - Downloads of folders stream an archive with relative names only.
 
-## Remote access model (Milestone 6)
+## Local only, short-lived
 
-- Only Cloudflare Tunnel. Vault never opens router ports and never listens publicly by default.
-- The tunnel exposes Vault's web interface only. **SMB is never exposed through the tunnel.** SFTP/WebDAV are not exposed unless the user explicitly enables them.
-- Remote access requires authentication; enabling it prompts for 2FA.
-- The tunnel token is stored in `~/.config/omarchy-vault/secrets/` with `chmod 600`, never logged, never returned by the API, and excluded from git by `.gitignore` patterns.
+- No remote access of any kind: no Cloudflare Tunnel, no VPN, no router port forwarding, no cloud relay. Phones reach Vault only on the same network.
+- Vault runs only after you turn it on (`vaultctl on`, a shortcut, or opening it); the systemd unit has no `[Install]` section, so it never starts at login or boot.
+- **Auto-off**: after `auto_off_minutes` (default 15) with no dashboard or API use, no active link and no transfer in progress, Vault shuts itself down, taking the file service and the phone port with it. `0` disables this.
 
 ## Storage safety
 

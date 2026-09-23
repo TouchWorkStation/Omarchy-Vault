@@ -3,7 +3,6 @@ import { icons, type IconName } from "./components/Icons";
 import { Home } from "./pages/Home";
 import { Storage } from "./pages/Storage";
 import { Settings } from "./pages/Settings";
-import { Planned } from "./pages/Planned";
 import { Setup } from "./pages/Setup";
 import { SignIn } from "./pages/SignIn";
 import { Files } from "./pages/Files";
@@ -29,7 +28,6 @@ export const routes: Route[] = [
   { path: "/upload", label: "Upload", icon: "upload" },
   { path: "/download", label: "Download", icon: "download" },
   { path: "/users", label: "Users", icon: "users", admin: true },
-  { path: "/remote", label: "Remote Access", icon: "remote", admin: true },
   { path: "/settings", label: "Settings", icon: "settings", admin: true },
 ];
 
@@ -89,15 +87,6 @@ function Page({ path }: { path: string }) {
       return <Download />;
     case "/users":
       return <Users />;
-    case "/remote":
-      return (
-        <Planned
-          title="REMOTE ACCESS"
-          milestone={6}
-          lead="Reach your Vault at your own domain from anywhere, through a Cloudflare tunnel. Nothing is opened on your router."
-          points={["Connect your domain", "TLS handled for you", "Off until you turn it on"]}
-        />
-      );
     default:
       return (
         <section className="page">
@@ -224,7 +213,7 @@ export function App() {
             </Link>
           ))}
         {isAdmin ? (
-          <Link to="/settings" className={`tab ${["/settings", "/users", "/remote", "/storage"].includes(path) ? "active" : ""}`}>
+          <Link to="/settings" className={`tab ${["/settings", "/users", "/storage"].includes(path) ? "active" : ""}`}>
             {icons.settings}
             <span>More</span>
           </Link>

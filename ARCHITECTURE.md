@@ -33,17 +33,18 @@ Omarchy Vault is one small Go daemon (`vaultd`), a CLI (`vaultctl`), a React das
         ▼                             ▼
   lsblk · findmnt · smartctl     SFTPGo child, 127.0.0.1:8789 (Files)  M3
   hyprctl · systemctl is-active  SQLite (tokens, shares, activity)     M4
-                                 vault-helper (privileged, allowlist)  M7
-                                 mergerfs · cloudflared · samba        M6/M7
+                                 vault-helper (privileged, allowlist)  M6
+                                 mergerfs · samba                      M6
 ```
 
 ## Principles
 
-1. **Orchestrate, don't reinvent.** Files and users are SFTPGo's job, pooling is mergerfs's, tunnels are cloudflared's. Vault owns the experience and the safety rules.
+1. **Orchestrate, don't reinvent.** Files and users are SFTPGo's job, pooling is mergerfs's. Vault owns the experience and the safety rules.
 2. **Read before write.** Milestone 1 is entirely read-only. Every later write goes through a narrow, named operation (for example `mount_pool()`), never a generic command.
 3. **Least privilege.** `vaultd` runs as the desktop user. Root is needed only for a few operations (mounting a pool, SMART on some drives, installing services). Those go to a separate privileged helper with a fixed allowlist of operations and validated arguments (see SECURITY.md).
-4. **Local first.** Binding to loopback is the default. Remote access is a tunnel the user turns on.
-5. **Lightweight.** One static binary, embedded UI, no background filesystem scanning. Idle RSS is about 10 MB today; the target is under 100 MB.
+4. **Local only.** The dashboard binds to loopback. Phones reach a separate transfer port on the LAN only while a link is active. There is no remote access.
+5. **Short-lived.** Vault runs only when turned on and stops itself after `auto_off_minutes` idle (`internal/api/autooff.go`: no API use, no active link, no transfer in progress).
+6. **Lightweight.** One static binary, embedded UI, no background filesystem scanning. Idle RSS is about 10 MB today; the target is under 100 MB.
 
 ## Data flow: drive discovery (Milestone 1)
 
@@ -81,7 +82,7 @@ Omarchy Vault is one small Go daemon (`vaultd`), a CLI (`vaultctl`), a React das
   vault.db                  SQLite from Milestone 4: tokens (hashed), shares, activity
 ```
 
-Default folders are created only if missing; existing files and folders are never overwritten. In Milestone 7, combining drives mounts a mergerfs pool (FUSE, as the user) and points `current` at it; `/srv/vault` does not change.
+Default folders are created only if missing; existing files and folders are never overwritten. In Milestone 6, combining drives mounts a mergerfs pool (FUSE, as the user) and points `current` at it; `/srv/vault` does not change.
 
 ## Files and accounts (Milestone 3)
 
@@ -148,7 +149,7 @@ Beam stays independent. When it wants persistent storage it can call:
 - `POST /api/v1/beam/download-session`
 - `POST /api/v1/beam/share`
 
-These return the same token/QR payloads as Vault's own flows and work today with the local owner token (`~/.config/omarchy-vault/secrets/local-token`, 0600) sent in the `X-Vault-Token` header; per-client keys arrive with Milestone 7.
+These return the same token/QR payloads as Vault's own flows and work today with the local owner token (`~/.config/omarchy-vault/secrets/local-token`, 0600) sent in the `X-Vault-Token` header; per-client keys arrive with Milestone 6.
 
 ## Repository layout
 
@@ -162,4 +163,4 @@ systemd/                     omarchy-vault.service (user unit)
 docs/                        development, security model, API, shortcuts
 ```
 
-Packages named in the original plan that have no code yet (`auth`, `upload`, `download`, `shares`, `cloudflare`) are created in the milestone that needs them, rather than as empty stubs.
+Packages named in the original plan that have no code yet (`auth`, `upload`, `download`, `shares`) are created in the milestone that needs them, rather than as empty stubs.

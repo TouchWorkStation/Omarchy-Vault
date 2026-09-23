@@ -30,8 +30,7 @@ Rectangle {
                 { id: "upload", label: "UPLOAD", detail: "Phone → Vault  ·  Super+Shift+U" },
                 { id: "download", label: "DOWNLOAD", detail: "Vault → Phone  ·  Super+Shift+D" },
                 { id: "files", label: "OPEN FILES", detail: "Browse your Vault" },
-                { id: "storage", label: "STORAGE", detail: "Drives and health" },
-                { id: "remote", label: "REMOTE ACCESS", detail: "Your domain" }
+                { id: "storage", label: "STORAGE", detail: "Drives and health" }
             ]
             delegate: Rectangle {
                 required property var modelData

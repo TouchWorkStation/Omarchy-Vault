@@ -113,3 +113,32 @@ func TestValidateFolder(t *testing.T) {
 		}
 	}
 }
+
+func TestOldConfigWithRemoteStillLoads(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	old := `{"version":1,"vault_root":"/srv/vault","listen":"127.0.0.1:8788","sources":[],"pool":{"mode":"none"},
+	  "preferences":{"upload_folder":"Phone Uploads","upload_expiry_minutes":10,"download_expiry_minutes":10,"download_max_count":1},
+	  "remote":{"enabled":false},"services":{"file_server":false,"lan_sharing":false,"tunnel":false},"security":{"allow_non_loopback_listen":false}}`
+	os.WriteFile(path, []byte(old), 0o600)
+	cfg, found, err := Load(path)
+	if err != nil || !found {
+		t.Fatalf("load = %v %v", found, err)
+	}
+	if cfg.AutoOffMinutes != DefaultAutoOffMinutes {
+		t.Errorf("auto off = %d", cfg.AutoOffMinutes)
+	}
+	os.WriteFile(path, []byte(`{"version":1,"bogus":true}`), 0o600)
+	if _, _, err := Load(path); err == nil {
+		t.Error("unknown key accepted")
+	}
+}
+
+func TestAutoOffRange(t *testing.T) {
+	for v, ok := range map[int]bool{0: true, 5: true, 15: true, 1440: true, 1: false, 4: false, 1441: false, -1: false} {
+		c := Default()
+		c.AutoOffMinutes = v
+		if err := c.Validate(); (err == nil) != ok {
+			t.Errorf("auto_off_minutes %d: err = %v", v, err)
+		}
+	}
+}

@@ -6,8 +6,8 @@ import { Badge, Card, HealthBadge, Loading, Notice } from "../components/ui";
 import { bytes } from "../format";
 import { useApi } from "../useApi";
 
-type Step = "welcome" | "storage" | "vault" | "account" | "remote" | "ready";
-const order: Step[] = ["welcome", "storage", "vault", "account", "remote", "ready"];
+type Step = "welcome" | "storage" | "vault" | "account" | "ready";
+const order: Step[] = ["welcome", "storage", "vault", "account", "ready"];
 
 interface Choice {
   disk: Disk;
@@ -167,7 +167,7 @@ function VaultStep({
             <input type="radio" name="use" checked readOnly />
             <span>
               <strong>One Vault</strong>
-              <span className="muted small">Combining several drives arrives in Milestone 7.</span>
+              <span className="muted small">Combining several drives arrives in Milestone 6.</span>
             </span>
           </label>
         </div>
@@ -383,28 +383,7 @@ export function Setup() {
       );
       break;
     case "account":
-      body = <AccountStep session={session} onDone={() => setStep("remote")} />;
-      break;
-    case "remote":
-      body = (
-        <>
-          <h1>REMOTE ACCESS</h1>
-          <Card>
-            <p className="lead">Reach your Vault from anywhere at your own domain.</p>
-            <p className="muted">
-              Vault stays private to this computer until you turn this on. Connecting Cloudflare arrives in Milestone 6.
-            </p>
-          </Card>
-          <div className="setup-actions">
-            <button className="btn" disabled>
-              Connect Cloudflare
-            </button>
-            <button className="btn btn-primary" onClick={() => setStep("ready")}>
-              Skip for now
-            </button>
-          </div>
-        </>
-      );
+      body = <AccountStep session={session} onDone={() => setStep("ready")} />;
       break;
     case "ready": {
       const st = result?.storage ?? status?.storage;

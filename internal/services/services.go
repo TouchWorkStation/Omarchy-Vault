@@ -35,11 +35,9 @@ func Known() []Component {
 		{ID: "findmnt", Name: "Mount table", Purpose: "Identifies the system drive", Binary: "findmnt", Package: "util-linux", Milestone: 1, Required: true},
 		{ID: "smartctl", Name: "Drive health", Purpose: "Reads SMART health data", Binary: "smartctl", Package: "smartmontools", Milestone: 1},
 		{ID: "vault", Name: "Vault service", Purpose: "Runs the Vault dashboard and API", Binary: "vaultd", Unit: "omarchy-vault.service", UserUnit: true, Package: "omarchy-vault", Milestone: 1, Required: true},
-		{ID: "mergerfs", Name: "Drive pooling", Purpose: "Combines several drives into one Vault", Binary: "mergerfs", Package: "mergerfs", Milestone: 7},
+		{ID: "mergerfs", Name: "Drive pooling", Purpose: "Combines several drives into one Vault", Binary: "mergerfs", Package: "mergerfs", Milestone: 6},
 		{ID: "sftpgo", Name: "Files", Purpose: "Browser file access for every Vault user (SFTPGo, run by Vault)", Binary: "sftpgo", Package: "scripts/build-sftpgo.sh", Milestone: 3},
-		{ID: "cloudflared", Name: "Remote access", Purpose: "Secure tunnel to your domain", Binary: "cloudflared", Unit: "cloudflared.service", Package: "cloudflared", Milestone: 6},
-		{ID: "samba", Name: "LAN sharing", Purpose: "Optional Windows/macOS network share", Binary: "smbd", Unit: "smb.service", Package: "samba", Milestone: 7},
-		{ID: "rsync", Name: "Computer backup", Purpose: "Copies folders into Vault", Binary: "rsync", Package: "rsync", Milestone: 8},
+		{ID: "samba", Name: "LAN sharing", Purpose: "Optional Windows/macOS network share", Binary: "smbd", Unit: "smb.service", Package: "samba", Milestone: 6},
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 
 // PoolRequest is the body of POST /api/pool.
 type PoolRequest struct {
-	// Mode is "single" (default). "combined" arrives in Milestone 7.
+	// Mode is "single" (default). "combined" arrives in Milestone 6.
 	Mode string `json:"mode"`
 	// Volume is a device name from GET /api/disks, e.g. "sda1".
 	Volume string `json:"volume"`
@@ -52,8 +52,8 @@ func (s *Server) handleAdopt(w http.ResponseWriter, r *http.Request) {
 	case "", "single":
 	case "combined":
 		writeJSON(w, http.StatusNotImplemented, map[string]any{
-			"error": "not_implemented", "milestone": 7,
-			"message": "Combining several drives into one Vault arrives in Milestone 7. Choose one drive for now.",
+			"error": "not_implemented", "milestone": 6,
+			"message": "Combining several drives into one Vault arrives in Milestone 6. Choose one drive for now.",
 		})
 		return
 	default:

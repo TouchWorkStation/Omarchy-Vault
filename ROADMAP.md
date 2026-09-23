@@ -6,7 +6,7 @@ Vault is built in milestones. Each ends in a working, tested, committed state. N
 
 - Repository, docs (README, ARCHITECTURE, SECURITY, ROADMAP, CONTRIBUTING)
 - Go backend skeleton (`vaultd`, `vaultctl`), React + Vite frontend
-- `GET /api/status`, `/api/disks`, `/api/storage`, `/api/settings`, `/api/shortcuts`, `/api/services`, `/api/remote`
+- `GET /api/status`, `/api/disks`, `/api/storage`, `/api/settings`, `/api/shortcuts`, `/api/services`
 - Read-only drive discovery with SYSTEM · PROTECTED detection (fail-safe)
 - SMART health parsing (Healthy / Warning / Critical / Unknown)
 - Dashboard, Storage and Settings pages; desktop and phone layouts
@@ -17,7 +17,7 @@ Vault is built in milestones. Each ends in a working, tested, committed state. N
 
 ## ✅ Milestone 2: Single-drive Vault
 
-- First-run flow: Welcome → Storage → Vault Storage → Account → Remote Access → Ready
+- First-run flow: Welcome → Storage → Vault Storage → Account → Ready
 - Adopt one mounted drive (a `Vault` folder on it, or the whole drive); `POST /api/pool`, `DELETE /api/pool`
 - System disk protection re-verified at adoption time on a fresh scan; clients send a volume name, never a path
 - Folder creation through `os.Root` (no symlink escapes), nested-mount check, never overwrites files
@@ -60,32 +60,21 @@ Vault is built in milestones. Each ends in a working, tested, committed state. N
 - `POST /api/download-session`: one file or folder, 10 minutes and 1 download by default (up to 60 min, 10 phones); a download counts once per phone, so resuming doesn't use it up
 - Folders download as a zip streamed on the fly (no temporary copy)
 - Mobile download page with no JavaScript needed to download
-- Share links: `POST /api/share`, `GET /api/shares`, `DELETE /api/share/{id}`; read only; 10 min to 30 days; one, limited or unlimited downloads; optional password (argon2id, lockout on guessing); shared folders list their files and download as .zip
+- Share links: `POST /api/share`, `GET /api/shares`, `DELETE /api/share/{id}`; read only; 10 min to 24 hours; one, limited or unlimited downloads; optional password (argon2id, lockout on guessing); shared folders list their files and download as .zip
 - `vaultctl share <file or folder> [--expires 24h] [--downloads N] [--password]`
 - Guests can download to their own phone but can't create share links
 - Beam: `POST /api/v1/beam/download-session`, `POST /api/v1/beam/share`
-- Deferred to Milestone 7: per-client API keys for local tools (Beam uses the local owner token, which only your user can read)
+- Deferred to Milestone 6: per-client API keys for local tools (Beam uses the local owner token, which only your user can read)
 
-## Milestone 6: Remote access
-
-- Detect/offer cloudflared, store token 0600, run the service, verify the tunnel
-- Status: Connected · TLS Active · Tunnel Running
-- Host allowlist and client-IP handling for the tunnel; 2FA prompt
-
-## Milestone 7: More drives, health, LAN
-
-- Per-client API keys for local tools such as Beam (moved from Milestone 4/5)
+## Milestone 6: More drives, health, LAN
 
 - Combine drives with mergerfs (non-destructive), per-drive capacity and health
-- SMART via the privileged helper, background polling at gentle intervals, alerts
-- Optional LAN sharing with Samba (off by default, never through the tunnel)
-
-## Milestone 8: Backups
-
-- Computer backup: chosen folders → `Backups/<hostname>/` with rsync, schedules, status
-- Phone backup: manual browser upload (no claim of full device backup)
-- Later options to evaluate: Syncthing, restic, borg
+- SMART checks via the privileged helper while Vault is on, with clear alerts (no background service)
+- Optional LAN sharing with Samba (off by default)
+- Per-client API keys for local tools such as Beam
 
 ## Not planned for v0.1
 
 Formatting or partitioning drives, RAID, ZFS management, a custom sync engine, a native phone app.
+
+Remote access from outside your home (Cloudflare Tunnel, VPN) and automatic backups were in the original plan and were dropped: Vault is local to your Wi-Fi and only runs for a short time when you use it.

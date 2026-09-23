@@ -57,15 +57,6 @@
         "http://127.0.0.1:8788/storage"
       ],
       "milestone": 1
-    },
-    {
-      "id": "remote",
-      "label": "Remote Access",
-      "command": [
-        "xdg-open",
-        "http://127.0.0.1:8788/remote"
-      ],
-      "milestone": 6
     }
   ],
   "shortcuts": [
