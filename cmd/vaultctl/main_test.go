@@ -141,3 +141,18 @@ func TestParseCopiedFiles(t *testing.T) {
 		t.Errorf("space in name: %v", got)
 	}
 }
+
+func TestParseCopiedFilesTolerant(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.jpg")
+	os.WriteFile(a, nil, 0o644)
+	for _, in := range []string{
+		"copy\nfile://" + a + "\x00",                      // trailing NUL
+		"copy\nfile://" + a + "\nfile://" + dir + "/gone", // one missing entry skipped
+		"file:" + a, // file: without //
+	} {
+		if got := parseCopiedFiles(in); len(got) != 1 || got[0] != a {
+			t.Errorf("parseCopiedFiles(%q) = %v", in, got)
+		}
+	}
+}

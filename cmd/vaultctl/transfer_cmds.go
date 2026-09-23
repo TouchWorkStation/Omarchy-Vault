@@ -112,6 +112,8 @@ func (a *app) download(ctx context.Context, args []string) error {
 			terminal = true
 		case "--picker":
 			picker = true
+		case "--check-clipboard":
+			return a.checkClipboard()
 		default:
 			if strings.HasPrefix(args[i], "-") || target != "" {
 				return fmt.Errorf("unexpected argument %q", args[i])
@@ -132,7 +134,11 @@ func (a *app) download(ctx context.Context, args []string) error {
 			body["path"] = rel
 		}
 	case !picker:
-		if copied := clipboardFiles(); len(copied) > 0 {
+		copied, looked := clipboardFiles()
+		if len(copied) == 0 && looked {
+			notify("Vault: couldn't read the copied files", "Opening the Vault picker instead. Run `vaultctl download --check-clipboard` to see why.")
+		}
+		if len(copied) > 0 {
 			body["local_paths"] = copied
 			names := make([]string, 0, len(copied))
 			for _, p := range copied {
@@ -279,43 +285,82 @@ func (a *app) resolveTarget(arg string) (rel, local string, err error) {
 	return "", "", err
 }
 
-// clipboardFiles returns the files copied in the file manager (Nautilus
-// and others put file:// URIs on the clipboard), or nothing when the
-// clipboard holds anything else. It only reads the clipboard.
-func clipboardFiles() []string {
-	if os.Getenv("WAYLAND_DISPLAY") == "" {
-		return nil
-	}
+// fileTypes are clipboard formats file managers use for copied files, in
+// order of preference; plain text is tried last.
+var fileTypes = []string{"x-special/gnome-copied-files", "text/uri-list", "text/plain;charset=utf-8", "text/plain", "UTF8_STRING"}
+
+// clipboardRead runs wl-paste; it only reads the clipboard.
+func clipboardRead(args ...string) (string, error) {
 	wlPaste, err := exec.LookPath("wl-paste")
+	if err != nil {
+		return "", errors.New("wl-paste not found (install wl-clipboard)")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, wlPaste, args...).Output()
+	if err != nil {
+		return "", err
+	}
+	if len(out) > 1<<20 {
+		return "", errors.New("clipboard too large")
+	}
+	return string(out), nil
+}
+
+func clipboardTypes() []string {
+	out, err := clipboardRead("--list-types")
 	if err != nil {
 		return nil
 	}
-	read := func(args ...string) string {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		out, err := exec.CommandContext(ctx, wlPaste, args...).Output()
-		if err != nil || len(out) > 1<<20 {
-			return ""
-		}
-		return string(out)
-	}
-	types := "\n" + read("--list-types") + "\n"
-	for _, t := range []string{"x-special/gnome-copied-files", "text/uri-list", "text/plain;charset=utf-8", "text/plain", "UTF8_STRING"} {
-		if !strings.Contains(types, "\n"+t+"\n") {
-			continue
-		}
-		if files := parseCopiedFiles(read("--no-newline", "--type", t)); len(files) > 0 {
-			return files
+	var types []string
+	for _, t := range strings.Split(out, "\n") {
+		if t = strings.TrimSpace(t); t != "" {
+			types = append(types, t)
 		}
 	}
-	return nil
+	return types
 }
 
-// parseCopiedFiles reads file:// URIs or absolute paths, one per line.
-// Anything that isn't entirely existing files (ordinary copied text) gives
-// nothing.
+func hasType(types []string, t string) bool {
+	for _, x := range types {
+		if strings.EqualFold(x, t) {
+			return true
+		}
+	}
+	return false
+}
+
+// clipboardFiles returns the files copied in the file manager, and
+// whether the clipboard claimed to hold files at all (so a failure to read
+// them can be reported instead of silently opening the picker).
+func clipboardFiles() (files []string, looksLikeFiles bool) {
+	if os.Getenv("WAYLAND_DISPLAY") == "" {
+		return nil, false
+	}
+	types := clipboardTypes()
+	looksLikeFiles = hasType(types, "x-special/gnome-copied-files") || hasType(types, "text/uri-list")
+	for _, t := range fileTypes {
+		if !hasType(types, t) {
+			continue
+		}
+		raw, err := clipboardRead("--no-newline", "--type", t)
+		if err != nil {
+			continue
+		}
+		if files := parseCopiedFiles(raw); len(files) > 0 {
+			return files, true
+		}
+	}
+	return nil, looksLikeFiles
+}
+
+// parseCopiedFiles reads file:// URIs or absolute paths, one per line
+// (Nautilus's "copy"/"cut" first line and comments skipped). Entries that
+// don't exist are left out. Text that isn't a list of files gives nothing.
 func parseCopiedFiles(s string) []string {
+	s = strings.ReplaceAll(s, "\x00", "\n")
 	var out []string
+	seen := map[string]bool{}
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(strings.TrimSuffix(line, "\r"))
 		switch line {
@@ -326,22 +371,64 @@ func parseCopiedFiles(s string) []string {
 			continue
 		}
 		p := line
-		if strings.HasPrefix(line, "file://") {
+		if strings.HasPrefix(line, "file:") {
 			u, err := url.Parse(line)
 			if err != nil || (u.Host != "" && u.Host != "localhost") {
-				return nil
+				continue
 			}
 			p = u.Path
 		}
 		if !filepath.IsAbs(p) {
-			return nil
+			return nil // ordinary text, not a list of files
 		}
-		if _, err := os.Lstat(p); err != nil {
-			return nil
+		p = filepath.Clean(p)
+		if _, err := os.Lstat(p); err != nil || seen[p] {
+			continue
 		}
-		out = append(out, filepath.Clean(p))
+		seen[p] = true
+		out = append(out, p)
 	}
 	return out
+}
+
+// checkClipboard prints what the clipboard holds and what Vault makes of
+// it, for troubleshooting "copy, then Super+Alt+D".
+func (a *app) checkClipboard() error {
+	w := a.out
+	fmt.Fprintf(w, "WAYLAND_DISPLAY=%q\n", os.Getenv("WAYLAND_DISPLAY"))
+	if p, err := exec.LookPath("wl-paste"); err != nil {
+		fmt.Fprintln(w, "wl-paste: not found (install wl-clipboard)")
+	} else {
+		fmt.Fprintf(w, "wl-paste: %s\n", p)
+	}
+	types := clipboardTypes()
+	fmt.Fprintf(w, "types: %s\n", strings.Join(types, ", "))
+	for _, t := range fileTypes {
+		if !hasType(types, t) {
+			continue
+		}
+		raw, err := clipboardRead("--no-newline", "--type", t)
+		if err != nil {
+			fmt.Fprintf(w, "\n[%s] read error: %v\n", t, err)
+			continue
+		}
+		shown := raw
+		if len(shown) > 400 {
+			shown = shown[:400] + "…"
+		}
+		fmt.Fprintf(w, "\n[%s] %q\n  -> %v\n", t, shown, parseCopiedFiles(raw))
+	}
+	files, _ := clipboardFiles()
+	fmt.Fprintf(w, "\nVault would send: %v\n", files)
+	return nil
+}
+
+// notify shows a desktop notification when one is possible (the shortcut
+// has no terminal to print to).
+func notify(summary, body string) {
+	if p, err := exec.LookPath("notify-send"); err == nil {
+		_ = exec.Command(p, "--app-name=Vault", summary, body).Run()
+	}
 }
 
 // vaultRel turns a path the user typed into a Vault path such as
