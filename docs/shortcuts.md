@@ -68,6 +68,19 @@ What it writes:
   source = ~/.config/hypr/omarchy-vault.conf
   ```
 
+## Hyprland's Lua config (current Omarchy)
+
+Current Omarchy configures Hyprland in Lua (`~/.config/hypr/hyprland.lua`, `bindings.lua`) instead of `hyprland.conf`. Vault detects this and then writes `~/.config/hypr/omarchy_vault.lua`, which uses Omarchy's `o.bind` (so the shortcuts appear in Omarchy's keybinding menu) or Hyprland's `hl.bind`, and adds one line at the end of `hyprland.lua`:
+
+```lua
+-- Omarchy Vault shortcuts (remove with: vaultctl shortcuts remove)
+pcall(dofile, (os.getenv("HOME") or "") .. "/.config/hypr/omarchy_vault.lua")
+```
+
+`pcall` means Hyprland's config still loads normally even if that file is ever missing or broken. Vault then runs `hyprctl reload` so the keys work at once. Conflicts are checked against the running Hyprland and the literal bindings in your Lua files and Omarchy's defaults. `vaultctl shortcuts remove` deletes the file and those two lines.
+
+Vault finds the config Hyprland actually uses: the file it was started with (`--config`), then `$XDG_CONFIG_HOME/hypr`, then `~/.config/hypr`, preferring `hyprland.lua` over `hyprland.conf`.
+
 ## Remove
 
 ```sh

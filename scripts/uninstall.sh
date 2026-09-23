@@ -19,7 +19,7 @@ fi
 
 # Vault's own shortcut file and its one source line (before vaultctl goes).
 HYPR_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
-if [[ -f "$HYPR_DIR/omarchy-vault.conf" && -x "$HOME/.local/bin/vaultctl" ]]; then
+if [[ ( -f "$HYPR_DIR/omarchy-vault.conf" || -f "$HYPR_DIR/omarchy_vault.lua" ) && -x "$HOME/.local/bin/vaultctl" ]]; then
   echo "==> Removing Vault's keyboard shortcuts (your others are untouched)"
   run "$HOME/.local/bin/vaultctl" shortcuts remove --yes || true
 fi

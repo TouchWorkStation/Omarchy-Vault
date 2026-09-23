@@ -355,14 +355,15 @@ func (a *app) shortcutsCmd(ctx context.Context, args []string) error {
 			fmt.Fprintln(a.out, "\n(Find your config with: hyprctl systeminfo | grep -i config, or ls ~/.config/hypr)")
 			return errors.New("Hyprland config not found")
 		}
-		fmt.Fprintf(a.out, "Vault will write %s:\n\n%s\n", shortcuts.IncludePath(insp.Home), shortcuts.Render(bs))
-		fmt.Fprintf(a.out, "and, if it is not there yet, add this line to %s:\n\n    %s\n\n", insp.ConfigPath, shortcuts.SourceLine())
+		fmt.Fprintf(a.out, "Vault will write %s:\n\n%s\n", shortcuts.FileFor(insp.Home, insp.ConfigPath), shortcuts.RenderFor(insp.ConfigPath, bs))
+		fmt.Fprintf(a.out, "and, if it is not there yet, add this line to %s:\n\n    %s\n\n", insp.ConfigPath, shortcuts.LoadLineFor(insp.ConfigPath))
 		if !yes && !confirm("Install these shortcuts?") {
 			return errors.New("cancelled; nothing was changed")
 		}
 		if _, err := shortcuts.Install(insp.Home, insp.ConfigPath, bs); err != nil {
 			return err
 		}
+		shortcuts.Reload(ctx, a.run)
 		fmt.Fprintln(a.out, "Done. Hyprland picks them up right away:")
 		for _, b := range bs {
 			fmt.Fprintf(a.out, "  %-22s %s\n", b.Combo(), b.Label)
@@ -375,6 +376,7 @@ func (a *app) shortcutsCmd(ctx context.Context, args []string) error {
 		if err := shortcuts.Remove(insp.Home, insp.ConfigPath); err != nil {
 			return err
 		}
+		shortcuts.Reload(ctx, a.run)
 		fmt.Fprintln(a.out, "Vault's shortcuts were removed. Your other bindings were not touched.")
 		return nil
 	default:

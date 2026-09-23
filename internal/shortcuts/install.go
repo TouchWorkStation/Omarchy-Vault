@@ -21,6 +21,30 @@ const (
 // IncludePath is ~/.config/hypr/omarchy-vault.conf.
 func IncludePath(home string) string { return filepath.Join(home, ".config", "hypr", includeName) }
 
+// FileFor is Vault's shortcut file for the given Hyprland config.
+func FileFor(home, conf string) string {
+	if IsLua(conf) {
+		return LuaIncludePath(home)
+	}
+	return IncludePath(home)
+}
+
+// RenderFor renders Vault's shortcut file in the config's format.
+func RenderFor(conf string, bs []Planned) string {
+	if IsLua(conf) {
+		return RenderLua(bs)
+	}
+	return Render(bs)
+}
+
+// LoadLineFor is the one line Vault adds to the main config.
+func LoadLineFor(conf string) string {
+	if IsLua(conf) {
+		return LuaLoadLine()
+	}
+	return SourceLine()
+}
+
 // SourceLine is the line added to hyprland.conf.
 func SourceLine() string { return "source = ~/.config/hypr/" + includeName }
 
@@ -96,6 +120,9 @@ func writeAtomic(path, content string) error {
 // Install writes Vault's include file and, if missing, appends the source
 // line to hyprland.conf. It returns whether hyprland.conf was changed.
 func Install(home, hyprlandConf string, bs []Planned) (bool, error) {
+	if IsLua(hyprlandConf) {
+		return installLua(home, hyprlandConf, bs)
+	}
 	conf, err := os.ReadFile(hyprlandConf)
 	if err != nil {
 		return false, fmt.Errorf("read %s: %w", hyprlandConf, err)
@@ -123,6 +150,16 @@ func Install(home, hyprlandConf string, bs []Planned) (bool, error) {
 
 // Remove deletes Vault's include file and the source line Vault added.
 func Remove(home, hyprlandConf string) error {
+	if IsLua(hyprlandConf) {
+		if err := removeLua(home, hyprlandConf); err != nil {
+			return err
+		}
+		// A .conf include left from an older install has nothing loading it.
+		if b, err := os.ReadFile(IncludePath(home)); err == nil && strings.HasPrefix(string(b), fileHeader) {
+			return os.Remove(IncludePath(home))
+		}
+		return nil
+	}
 	inc := IncludePath(home)
 	if existing, err := os.ReadFile(inc); err == nil {
 		if !strings.HasPrefix(string(existing), fileHeader) {

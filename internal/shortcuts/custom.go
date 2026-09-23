@@ -99,7 +99,7 @@ func Build(r Request) (Planned, error) {
 // isVault reports whether a binding is one of Vault's own (in its file,
 // or running vaultctl), which a new choice may replace.
 func isVault(b Binding) bool {
-	return strings.Contains(b.Arg, "vaultctl ") || strings.HasSuffix(b.Source, "/"+includeName)
+	return strings.Contains(b.Arg, "vaultctl ") || strings.HasSuffix(b.Source, "/"+includeName) || strings.HasSuffix(b.Source, "/"+luaName)
 }
 
 // Bindings collects the user's existing bindings from Hyprland and its
@@ -157,6 +157,9 @@ func CheckAll(existing []Binding, reqs []Request) []Result {
 
 // Installed reads Vault's own shortcut file: what is set up now.
 func Installed(home string) []Planned {
+	if lua := installedLua(home); lua != nil {
+		return lua
+	}
 	f, err := os.Open(IncludePath(home))
 	if err != nil {
 		return nil

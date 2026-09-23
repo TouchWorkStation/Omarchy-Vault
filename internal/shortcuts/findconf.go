@@ -10,7 +10,8 @@ import (
 
 // FindConfig locates the Hyprland config actually in use: the file the
 // running Hyprland was started with (-c/--config), then
-// $XDG_CONFIG_HOME/hypr/hyprland.conf, then ~/.config/hypr/hyprland.conf.
+// $XDG_CONFIG_HOME/hypr, then ~/.config/hypr; in each folder hyprland.lua
+// (Hyprland's Lua config, used by current Omarchy) before hyprland.conf.
 // It returns the first that exists, or the default path and false.
 func FindConfig(home string) (string, bool) {
 	return findConfig("/proc", home, os.Getenv("XDG_CONFIG_HOME"), os.Getuid())
@@ -35,10 +36,21 @@ func candidates(proc, home, xdg string, uid int) []string {
 	if p := runningConfig(proc, home, uid); p != "" {
 		out = append(out, p)
 	}
+	var dirs []string
 	if xdg != "" && filepath.IsAbs(xdg) {
-		out = append(out, filepath.Join(xdg, "hypr", "hyprland.conf"))
+		dirs = append(dirs, filepath.Join(xdg, "hypr"))
 	}
-	return append(out, filepath.Join(home, ".config", "hypr", "hyprland.conf"))
+	dirs = append(dirs, filepath.Join(home, ".config", "hypr"))
+	seen := map[string]bool{}
+	for _, d := range dirs {
+		for _, name := range []string{"hyprland.lua", "hyprland.conf"} {
+			if p := filepath.Join(d, name); !seen[p] {
+				seen[p] = true
+				out = append(out, p)
+			}
+		}
+	}
+	return out
 }
 
 // runningConfig reads the --config/-c argument of this user's Hyprland

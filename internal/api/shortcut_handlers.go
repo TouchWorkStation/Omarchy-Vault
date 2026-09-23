@@ -29,7 +29,7 @@ func (s *Server) handleShortcuts(w http.ResponseWriter, r *http.Request) {
 		Current: cur,
 		Mods:    shortcuts.ModChoices,
 		Keys:    shortcuts.KeyChoices(),
-		File:    shortcuts.IncludePath(s.Shortcuts.Home),
+		File:    shortcuts.FileFor(s.Shortcuts.Home, s.Shortcuts.ConfigPath),
 	})
 }
 
@@ -104,6 +104,7 @@ func (s *Server) handleSaveShortcuts(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "install_failed", "The shortcuts could not be saved: "+err.Error())
 		return
 	}
+	shortcuts.Reload(r.Context(), s.Run)
 	s.Log.Info("shortcuts saved", "count", len(bs))
 	s.handleShortcuts(w, r)
 }
@@ -117,6 +118,7 @@ func (s *Server) removeShortcuts(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "remove_failed", "The shortcuts could not be removed: "+err.Error())
 		return
 	}
+	shortcuts.Reload(r.Context(), s.Run)
 	s.Log.Info("shortcuts removed")
 	s.handleShortcuts(w, r)
 }

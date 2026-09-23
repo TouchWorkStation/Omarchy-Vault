@@ -23,7 +23,7 @@ var allowed = map[string]bool{
 	"findmnt":   true, // read-only mount table
 	"blkid":     true, // read-only filesystem identification
 	"smartctl":  true, // read-only SMART health (-H/-A/-i only)
-	"hyprctl":   true, // read-only keybinding listing (binds -j)
+	"hyprctl":   true, // keybinding listing (binds -j); reload after Vault changes its own shortcut file
 	"systemctl": true, // read-only unit state (is-active)
 }
 

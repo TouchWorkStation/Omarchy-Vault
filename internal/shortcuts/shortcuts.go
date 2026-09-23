@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
@@ -281,7 +282,13 @@ func (in Inspector) collect(ctx context.Context) ([]Binding, Report) {
 		}
 	}
 
-	if in.ConfigPath != "" {
+	if IsLua(in.ConfigPath) {
+		if _, err := os.Stat(in.ConfigPath); err == nil {
+			bs, files := parseLuaTree(in.ConfigPath, in.Home)
+			all = append(all, bs...)
+			rep.Sources = append(rep.Sources, files...)
+		}
+	} else if in.ConfigPath != "" {
 		bs, files, warns := parseConfigTree(in.ConfigPath, in.Home)
 		rep.Warnings = append(rep.Warnings, warns...)
 		if len(files) > 0 {
