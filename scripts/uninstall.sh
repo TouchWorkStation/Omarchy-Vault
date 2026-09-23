@@ -37,6 +37,9 @@ for f in "$HOME/.local/bin/vaultd" "$HOME/.local/bin/vaultctl" "$UNIT"; do
   [[ -e "$f" ]] && run rm -f "$f"
 done
 [[ -d "$DATA_DIR/plugin" ]] && run rm -rf "$DATA_DIR/plugin"
+# The build copy the plugin installer made (source and build output only).
+BUILD_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/omarchy-vault"
+[[ -d "$BUILD_CACHE" ]] && run rm -rf "$BUILD_CACHE"
 # The file service program (its database with your users stays).
 for d in bin templates static; do
   [[ -d "$DATA_DIR/sftpgo/$d" ]] && run rm -rf "$DATA_DIR/sftpgo/$d"

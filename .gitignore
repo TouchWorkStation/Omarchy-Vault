@@ -21,3 +21,4 @@ credentials*.json
 .idea/
 .vscode/
 .testmnt-*/
+.version

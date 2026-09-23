@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "touchworkstation.vault",
+  "name": "Omarchy Vault",
+  "version": "0.1.0",
+  "author": "TouchWorkStation",
+  "license": "MIT",
+  "description": "Turn a spare drive into a private cloud on your home Wi-Fi. Press Super+Alt+U to upload from your phone by QR code, or copy files and press Super+Alt+D to send them to your phone. Local only, and it only runs while you use it.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "plugin/VaultWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Vault",
+    "description": "Open Vault, upload from your phone (right-click), or send copied files to your phone (middle-click).",
+    "category": "Info",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

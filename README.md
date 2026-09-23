@@ -55,6 +55,31 @@ It is **not** a replacement for TrueNAS, Unraid or ZimaOS. Vault uses the drives
 - **Drive health**: SMART status, temperature, power-on hours, reallocated sectors. Errors are never hidden.
 - **Light**: nothing runs until you use it; it turns itself off after 15 idle minutes.
 
+## Install as an Omarchy plugin
+
+```sh
+omarchy plugin add https://github.com/TouchWorkStation/Omarchy-Vault.git --enable
+```
+
+This puts a Vault icon in the bar. Omarchy's plugin installer never runs code from a plugin, so the first click on the icon opens a terminal that installs Vault (it asks for your password for `sudo` a couple of times), then opens the setup screen: pick your drive, create your account, done.
+
+| On the Vault icon | Does |
+|---|---|
+| Click | Open Vault |
+| Right-click | Upload to Vault: QR code for your phone |
+| Middle-click | Send the files you copied to your phone |
+
+The same actions have keyboard shortcuts: Super + Alt + V, U and D (change them in Settings).
+
+**Removing it:** first remove Vault itself, then the plugin:
+
+```sh
+~/.config/omarchy/plugins/touchworkstation.vault/scripts/uninstall.sh
+omarchy plugin remove touchworkstation.vault
+```
+
+The uninstaller removes Vault's programs, service, shortcuts and firewall rule. Your files, your drive and your settings stay (it tells you how to remove settings too).
+
 ## Quick start
 
 **One command** (Omarchy / Arch). Plug in your drive and click it in the Files app sidebar so it's mounted, then paste this into a terminal:

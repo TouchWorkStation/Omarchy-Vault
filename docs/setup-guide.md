@@ -186,6 +186,8 @@ If your drive is missing or not usable, see [Troubleshooting](#11-troubleshootin
 
 ## 3. Install Vault
 
+**As an Omarchy plugin.** `omarchy plugin add https://github.com/TouchWorkStation/Omarchy-Vault.git --enable`, then click the new Vault icon in the bar: it opens a terminal that runs the express install below from the plugin's folder and then the setup screen. The plugin folder itself is never modified; Vault is built in `~/.cache/omarchy-vault/build`.
+
 **The quick way.** Make sure your drive is mounted (section 2; clicking it in the Files app is enough), then:
 
 ```sh

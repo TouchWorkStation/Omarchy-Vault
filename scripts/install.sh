@@ -33,6 +33,14 @@ done
 
 cd "$(dirname "$0")/.."
 REPO="$(pwd)"
+# Where Vault is built. Installed as an Omarchy plugin, the repo is the
+# plugin folder, which must stay exactly as cloned (no build output, no
+# node_modules symlinks, which the shell refuses), so build a clean copy
+# in the cache instead.
+BUILD="$REPO"
+case "$REPO/" in
+  "$HOME/.config/omarchy/plugins/"*) BUILD="${XDG_CACHE_HOME:-$HOME/.cache}/omarchy-vault/build" ;;
+esac
 BIN_DIR="$HOME/.local/bin"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-vault"
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
@@ -108,9 +116,19 @@ if [[ $NO_BUILD -eq 0 ]]; then
     fi
   fi
   say "Building Vault"
-  run make -C "$REPO" all
+  if [[ $BUILD != "$REPO" ]]; then
+    note "Building in $BUILD so the plugin folder stays untouched"
+    run rm -rf "$BUILD"
+    run mkdir -p "$BUILD"
+    if [[ $DRY_RUN -eq 0 ]]; then
+      git -C "$REPO" archive --format=tar HEAD | tar -x -C "$BUILD"
+      # The build stamps the version from git; give the copy the same one.
+      printf '%s\n' "$(git -C "$REPO" describe --always --dirty 2>/dev/null || echo dev)" > "$BUILD/.version"
+    fi
+  fi
+  run make -C "$BUILD" all
 fi
-[[ $DRY_RUN -eq 1 || -x "$REPO/bin/vaultd" ]] || { echo "bin/vaultd missing; run make all" >&2; exit 1; }
+[[ $DRY_RUN -eq 1 || -x "$BUILD/bin/vaultd" ]] || { echo "bin/vaultd missing; run make all" >&2; exit 1; }
 
 # 4b. File service (SFTPGo), built from a pinned, verified source tag into
 #     your home folder. Needed for Files and user accounts' file access.
@@ -149,8 +167,8 @@ fi
 # 7. Binaries.
 say "Installing binaries to $BIN_DIR"
 run install -d "$BIN_DIR"
-run install -m 0755 "$REPO/bin/vaultd" "$BIN_DIR/vaultd"
-run install -m 0755 "$REPO/bin/vaultctl" "$BIN_DIR/vaultctl"
+run install -m 0755 "$BUILD/bin/vaultd" "$BIN_DIR/vaultd"
+run install -m 0755 "$BUILD/bin/vaultctl" "$BIN_DIR/vaultctl"
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
   *) warn "$BIN_DIR is not on your PATH." ;;
@@ -179,14 +197,6 @@ elif ask "Turn Vault on now? (it stays off until you turn it on)"; then
 else
   note "Turn it on whenever you need it: vaultctl on  (or open it with vaultctl open)"
 fi
-
-# 9. Omarchy plugin files (not wired into the panel until it is ready).
-say "Installing Omarchy integration files"
-run install -d "$DATA_DIR/plugin/qml"
-run install -m 0644 "$REPO/plugin/manifest.json" "$DATA_DIR/plugin/manifest.json"
-for f in "$REPO"/plugin/qml/*.qml; do
-  run install -m 0644 "$f" "$DATA_DIR/plugin/qml/$(basename "$f")"
-done
 
 # 10. Firewall: phones reach Vault on port 8790 (only while a QR code is
 # showing). Allow it from your home network only, never from anywhere.

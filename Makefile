@@ -1,8 +1,10 @@
 # Omarchy Vault — build targets. Every target is read-only with respect to
 # your drives; `install` is delegated to scripts/install.sh, which asks first.
 
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.1.0-dev)
-COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+# A build copy without .git (the plugin installer's) carries its version in
+# .version.
+VERSION ?= $(shell cat .version 2>/dev/null || git describe --tags --always --dirty 2>/dev/null || echo 0.1.0-dev)
+COMMIT  ?= $(shell cat .version 2>/dev/null || git rev-parse --short HEAD 2>/dev/null || echo unknown)
 LDFLAGS := -s -w \
 	-X github.com/TouchWorkStation/Omarchy-Vault/internal/version.Version=$(VERSION) \
 	-X github.com/TouchWorkStation/Omarchy-Vault/internal/version.Commit=$(COMMIT)
