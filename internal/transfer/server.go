@@ -314,6 +314,8 @@ type pageData struct {
 	More     int
 	Error    string
 	LimitMsg string
+	// Label replaces "Folder" for a zip of several items.
+	Label string
 }
 
 type fileRow struct {

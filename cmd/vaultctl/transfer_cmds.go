@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -82,10 +83,12 @@ func (a *app) upload(ctx context.Context, args []string) error {
 	return nil
 }
 
-// download: Super+Alt+D. Without a path it opens Vault's file picker;
-// with one it creates a download link for that file or folder right away.
+// download: Super+Alt+D. With a path it sends that file or folder (in the
+// Vault or anywhere on this computer). Without one it sends the files you
+// copied in the file manager, or opens Vault's picker if none are copied
+// (--picker always opens the picker).
 func (a *app) download(ctx context.Context, args []string) error {
-	target, minutes, count, terminal := "", 0, 0, false
+	target, minutes, count, terminal, picker := "", 0, 0, false, false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--minutes", "--downloads":
@@ -107,6 +110,8 @@ func (a *app) download(ctx context.Context, args []string) error {
 			i++
 		case "--terminal", "-t":
 			terminal = true
+		case "--picker":
+			picker = true
 		default:
 			if strings.HasPrefix(args[i], "-") || target != "" {
 				return fmt.Errorf("unexpected argument %q", args[i])
@@ -114,21 +119,38 @@ func (a *app) download(ctx context.Context, args []string) error {
 			target = args[i]
 		}
 	}
+	body := map[string]any{"client": "cli", "minutes": minutes, "max_downloads": count}
+	switch {
+	case target != "":
+		rel, local, err := a.resolveTarget(target)
+		if err != nil {
+			return err
+		}
+		if local != "" {
+			body["local_paths"] = []string{local}
+		} else {
+			body["path"] = rel
+		}
+	case !picker:
+		if copied := clipboardFiles(); len(copied) > 0 {
+			body["local_paths"] = copied
+			names := make([]string, 0, len(copied))
+			for _, p := range copied {
+				names = append(names, filepath.Base(p))
+			}
+			fmt.Fprintf(a.out, "Sending what you copied: %s\n", strings.Join(names, ", "))
+		}
+	}
 	if err := a.ensureOn(ctx); err != nil {
 		return err
 	}
-	if target == "" {
+	if body["path"] == nil && body["local_paths"] == nil {
 		if terminal || !hasDisplay() {
-			return errors.New("choose what to send: vaultctl download <file or folder in the Vault>")
+			return errors.New("choose what to send: vaultctl download <file or folder>, or copy files in the file manager first")
 		}
 		return a.openApp(ctx, "/download")
 	}
-	rel, err := a.vaultRel(target)
-	if err != nil {
-		return err
-	}
 	var link linkView
-	body := map[string]any{"client": "cli", "path": rel, "minutes": minutes, "max_downloads": count}
 	if err := a.call(ctx, http.MethodPost, "/api/download-session", body, &link); err != nil {
 		return err
 	}
@@ -240,6 +262,86 @@ func parseExpiry(s string) (int, error) {
 		return 0, bad
 	}
 	return n, nil
+}
+
+// resolveTarget turns a typed path into a Vault path, or, for a file
+// elsewhere on this computer, its absolute path.
+func (a *app) resolveTarget(arg string) (rel, local string, err error) {
+	rel, err = a.vaultRel(arg)
+	if err == nil {
+		return rel, "", nil
+	}
+	if abs, aerr := filepath.Abs(arg); aerr == nil {
+		if _, serr := os.Lstat(abs); serr == nil {
+			return "", abs, nil
+		}
+	}
+	return "", "", err
+}
+
+// clipboardFiles returns the files copied in the file manager (Nautilus
+// and others put file:// URIs on the clipboard), or nothing when the
+// clipboard holds anything else. It only reads the clipboard.
+func clipboardFiles() []string {
+	if os.Getenv("WAYLAND_DISPLAY") == "" {
+		return nil
+	}
+	wlPaste, err := exec.LookPath("wl-paste")
+	if err != nil {
+		return nil
+	}
+	read := func(args ...string) string {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, wlPaste, args...).Output()
+		if err != nil || len(out) > 1<<20 {
+			return ""
+		}
+		return string(out)
+	}
+	types := "\n" + read("--list-types") + "\n"
+	for _, t := range []string{"x-special/gnome-copied-files", "text/uri-list", "text/plain;charset=utf-8", "text/plain", "UTF8_STRING"} {
+		if !strings.Contains(types, "\n"+t+"\n") {
+			continue
+		}
+		if files := parseCopiedFiles(read("--no-newline", "--type", t)); len(files) > 0 {
+			return files
+		}
+	}
+	return nil
+}
+
+// parseCopiedFiles reads file:// URIs or absolute paths, one per line.
+// Anything that isn't entirely existing files (ordinary copied text) gives
+// nothing.
+func parseCopiedFiles(s string) []string {
+	var out []string
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		switch line {
+		case "", "copy", "cut":
+			continue
+		}
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		p := line
+		if strings.HasPrefix(line, "file://") {
+			u, err := url.Parse(line)
+			if err != nil || (u.Host != "" && u.Host != "localhost") {
+				return nil
+			}
+			p = u.Path
+		}
+		if !filepath.IsAbs(p) {
+			return nil
+		}
+		if _, err := os.Lstat(p); err != nil {
+			return nil
+		}
+		out = append(out, filepath.Clean(p))
+	}
+	return out
 }
 
 // vaultRel turns a path the user typed into a Vault path such as
@@ -354,7 +456,15 @@ func (a *app) watchInTerminal(ctx context.Context, link linkView) error {
 	fmt.Fprint(w, qr)
 	fmt.Fprintf(w, "\nScan with your phone (same Wi-Fi as this computer).\n%s\n", link.URL)
 	if link.Kind == "download" {
-		fmt.Fprintf(w, "Sending: Vault › %s   ·   valid until %s   ·   Ctrl+C to stop\n\n", link.Path, link.ExpiresAt.Local().Format("15:04"))
+		what := "Vault › " + link.Path
+		if strings.HasPrefix(link.Path, "/") { // copied files from this computer
+			var names []string
+			for _, p := range strings.Split(link.Path, "\n") {
+				names = append(names, filepath.Base(p))
+			}
+			what = strings.Join(names, ", ")
+		}
+		fmt.Fprintf(w, "Sending: %s   ·   valid until %s   ·   Ctrl+C to stop\n\n", what, link.ExpiresAt.Local().Format("15:04"))
 	} else {
 		fmt.Fprintf(w, "Files go to: Vault › %s   ·   valid until %s   ·   Ctrl+C to stop\n\n", link.Folder, link.ExpiresAt.Local().Format("15:04"))
 	}

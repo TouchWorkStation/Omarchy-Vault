@@ -203,25 +203,47 @@ func ServeZip(w http.ResponseWriter, root *os.Root, dir string) error {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", attachment(name+".zip"))
 	zw := zip.NewWriter(w)
-	for _, e := range files {
-		f, err := root.OpenFile(dir+"/"+e.Path, readFlags, 0)
-		if err != nil {
-			continue // vanished or unreadable since listing: leave it out
-		}
-		if info, err := f.Stat(); err != nil || !info.Mode().IsRegular() {
-			f.Close()
-			continue
-		}
-		hdr := &zip.FileHeader{Name: name + "/" + e.Path, Method: zip.Store, Modified: e.Modified}
-		hdr.SetMode(0o644)
-		dst, err := zw.CreateHeader(hdr)
-		if err == nil {
-			_, err = io.Copy(dst, f)
-		}
-		f.Close()
-		if err != nil {
-			return err // the phone went away
-		}
+	if err := zipFiles(zw, root, dir, name, files); err != nil {
+		return err
 	}
 	return zw.Close()
+}
+
+// zipFiles adds files (as listed by Walk under dir) to zw, named
+// prefix/<path>.
+func zipFiles(zw *zip.Writer, root *os.Root, dir, prefix string, files []Entry) error {
+	for _, e := range files {
+		src := e.Path
+		if dir != "" {
+			src = dir + "/" + e.Path
+		}
+		name := e.Path
+		if prefix != "" {
+			name = prefix + "/" + e.Path
+		}
+		if err := zipOne(zw, root, src, name, e.Modified); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// zipOne adds one regular file; a file that vanished or changed type since
+// it was listed is left out.
+func zipOne(zw *zip.Writer, root *os.Root, src, name string, mod time.Time) error {
+	f, err := root.OpenFile(src, readFlags, 0)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	if info, err := f.Stat(); err != nil || !info.Mode().IsRegular() {
+		return nil
+	}
+	hdr := &zip.FileHeader{Name: name, Method: zip.Store, Modified: mod}
+	hdr.SetMode(0o644)
+	dst, err := zw.CreateHeader(hdr)
+	if err == nil {
+		_, err = io.Copy(dst, f)
+	}
+	return err // non-nil: the phone went away
 }

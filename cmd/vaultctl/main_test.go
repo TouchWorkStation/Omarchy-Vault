@@ -114,3 +114,30 @@ func TestLaunchFallsThroughFailingLauncher(t *testing.T) {
 		t.Error("no display should be an error")
 	}
 }
+
+func TestParseCopiedFiles(t *testing.T) {
+	dir := t.TempDir()
+	a, b := filepath.Join(dir, "my photo.jpg"), filepath.Join(dir, "doc.pdf")
+	os.WriteFile(a, nil, 0o644)
+	os.WriteFile(b, nil, 0o644)
+	uri := "file://" + strings.ReplaceAll(a, " ", "%20")
+	cases := map[string]int{
+		"copy\n" + uri + "\nfile://" + b: 2, // Nautilus (x-special/gnome-copied-files)
+		uri + "\r\nfile://" + b + "\r\n": 2, // text/uri-list
+		"# comment\n" + uri:              1,
+		a:                                1, // plain path
+		"just some text I copied":        0,
+		a + "\nand some text":            0,
+		"file://otherhost" + a:           0,
+		"file://" + dir + "/missing.txt": 0,
+	}
+	for in, want := range cases {
+		got := parseCopiedFiles(in)
+		if len(got) != want {
+			t.Errorf("parseCopiedFiles(%q) = %v, want %d files", in, got, want)
+		}
+	}
+	if got := parseCopiedFiles("copy\n" + uri); len(got) != 1 || got[0] != a {
+		t.Errorf("space in name: %v", got)
+	}
+}

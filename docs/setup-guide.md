@@ -412,7 +412,9 @@ The phone setup from section 8 (same Wi-Fi, firewall rule for port 8790) applies
 3. Keep **To my phone**, choose how long the code works (10 minutes by default) and how many phones may use it (once by default), then **Show QR code**.
 4. Scan it with the phone's camera and tap **Download**. The screen on the computer says *Done* when it has been downloaded.
 
-From a terminal: `vaultctl download "/srv/vault/Photos/2024/beach.jpg"` (or the Vault path, `Photos/2024/beach.jpg`), with `--terminal` to print the QR code in the terminal, `--minutes 30`, `--downloads 3`.
+**Quickest: copy, then press the shortcut.** In the Files app, select one or more files or folders and press **Ctrl + C**, then press **Super + Alt + D**. Vault shows a QR code for exactly what you copied: from anywhere on your computer, not only the Vault. Several items or a folder arrive as one `.zip`. The window names what is being sent, so check it before you scan. If nothing is copied, Super + Alt + D opens the Vault picker instead (`vaultctl download --picker` always does). Private folders (`~/.ssh`, `~/.gnupg`, Vault's own settings, system folders) are never sent, and neither is a folder that contains them, such as your whole home folder.
+
+From a terminal: `vaultctl download "/srv/vault/Photos/2024/beach.jpg"` (any file on your computer works too) (or the Vault path, `Photos/2024/beach.jpg`), with `--terminal` to print the QR code in the terminal, `--minutes 30`, `--downloads 3`.
 
 An interrupted download can be retried from the same phone until the code expires; it isn't counted twice.
 

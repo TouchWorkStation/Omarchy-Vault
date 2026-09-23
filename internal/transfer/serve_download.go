@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
@@ -115,6 +116,10 @@ func (s *Server) openVault(w http.ResponseWriter) (*os.Root, bool) {
 }
 
 func (s *Server) missing(w http.ResponseWriter, err error) {
+	if errors.Is(err, ErrPrivate) {
+		s.problem(w, http.StatusForbidden, "That can't be sent: it holds private keys or settings.")
+		return
+	}
 	if errors.Is(err, ErrNoSuch) || errors.Is(err, ErrBadPath) || errors.Is(err, errNotInside) {
 		s.problem(w, http.StatusNotFound, "That file is no longer in the Vault.")
 		return
@@ -166,6 +171,10 @@ func (s *Server) downloadPage(w http.ResponseWriter, r *http.Request) {
 		s.ended(w, err, KindDownload)
 		return
 	}
+	if IsLocal(sess) {
+		s.localPage(w, r, sess)
+		return
+	}
 	root, ok := s.openVault(w)
 	if !ok {
 		return
@@ -186,6 +195,10 @@ func (s *Server) downloadFile(w http.ResponseWriter, r *http.Request) {
 	sess, counted, err := s.usable(r, KindDownload, "")
 	if err != nil {
 		s.ended(w, err, KindDownload)
+		return
+	}
+	if IsLocal(sess) {
+		s.sendLocal(w, r, sess, counted)
 		return
 	}
 	s.send(w, r, sess, sess.Path, "", counted)
@@ -376,4 +389,60 @@ func humanBytes(n int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "KMGTPE"[exp])
+}
+
+// localPage shows what a local (from-this-computer) download sends.
+func (s *Server) localPage(w http.ResponseWriter, r *http.Request, sess Session) {
+	items, done, err := openLocal(LocalPaths(sess))
+	if err != nil {
+		s.missing(w, err)
+		return
+	}
+	defer done()
+	name, zipped, files, total, err := localSummary(items)
+	if err != nil {
+		s.missing(w, err)
+		return
+	}
+	d := pageData{Token: r.PathValue("token"), Name: name, Size: humanBytes(total), Expires: sess.ExpiresAt.UnixMilli(), IsDir: zipped, Count: files}
+	if zipped {
+		d.Name = strings.TrimSuffix(name, ".zip")
+		if len(items) > 1 {
+			d.Label = fmt.Sprintf("%d items", len(items))
+		}
+	}
+	if sess.MaxFiles < Unlimited {
+		left := sess.MaxFiles - sess.Files
+		d.LimitMsg = fmt.Sprintf("Can be downloaded %d more time%s.", left, plural(left))
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = pages.ExecuteTemplate(w, "download.html", d)
+}
+
+// sendLocal streams a local download, counting it once per phone.
+func (s *Server) sendLocal(w http.ResponseWriter, r *http.Request, sess Session, counted bool) {
+	items, done, err := openLocal(LocalPaths(sess))
+	if err != nil {
+		s.missing(w, err)
+		return
+	}
+	defer done()
+	name, _, _, total, err := localSummary(items)
+	if err != nil {
+		s.missing(w, err)
+		return
+	}
+	s.inflight.Add(1)
+	defer s.inflight.Add(-1)
+	if !counted && r.Method == http.MethodGet {
+		if err := s.count(r.Context(), sess, clientIP(r), "", name, total); err != nil {
+			s.ended(w, err, sess.Kind)
+			return
+		}
+	}
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Now().Add(12 * time.Hour))
+	if err := serveLocal(w, r, items, name); err != nil {
+		s.Log.Info("download ended early", "err", err)
+	}
 }

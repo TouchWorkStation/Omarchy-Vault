@@ -159,3 +159,42 @@ func TestSharePermissionsAndOptions(t *testing.T) {
 		t.Errorf("beam as family = %d", w.Code)
 	}
 }
+
+func TestLocalFilesNeedTheLocalToken(t *testing.T) {
+	e := newEnv(t)
+	admin := bootstrap(t, e)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	doc := filepath.Join(home, "Documents", "notes.txt")
+	os.MkdirAll(filepath.Dir(doc), 0o755)
+	os.WriteFile(doc, []byte("hello"), 0o644)
+	os.MkdirAll(filepath.Join(home, ".ssh"), 0o700)
+	os.WriteFile(filepath.Join(home, ".ssh", "id_rsa"), []byte("key"), 0o600)
+
+	body := map[string]any{"local_paths": []string{doc}}
+	// A browser session, even an admin's, can't send files outside the Vault.
+	if w := e.req("POST", "/api/download-session", body, admin); w.Code != http.StatusForbidden {
+		t.Fatalf("admin session = %d %s", w.Code, w.Body)
+	}
+	// The owner's local token (vaultctl) can, and nothing needs the Vault.
+	w := e.req("POST", "/api/download-session", body, tokenHdr)
+	var link LinkView
+	json.Unmarshal(w.Body.Bytes(), &link)
+	if w.Code != 200 || !strings.Contains(link.URL, "/d/") {
+		t.Fatalf("local token = %d %s", w.Code, w.Body)
+	}
+	resp, err := http.Get(link.URL + "/file")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if string(b) != "hello" {
+		t.Errorf("phone got %q", b)
+	}
+	for _, p := range []string{filepath.Join(home, ".ssh", "id_rsa"), home, "/etc/passwd"} {
+		if w := e.req("POST", "/api/download-session", map[string]any{"local_paths": []string{p}}, tokenHdr); w.Code != http.StatusForbidden {
+			t.Errorf("%s = %d", p, w.Code)
+		}
+	}
+}

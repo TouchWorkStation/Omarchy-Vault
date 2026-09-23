@@ -21,7 +21,7 @@
     <span class="icon">{{if .IsDir}}▣{{else}}▤{{end}}</span>
     <div>
       <p class="item-name">{{.Name}}{{if .IsDir}}.zip{{end}}</p>
-      <p class="muted small">{{if .IsDir}}Folder · {{.Count}} file{{if ne .Count 1}}s{{end}} · {{end}}{{.Size}}</p>
+      <p class="muted small">{{if .IsDir}}{{if .Label}}{{.Label}}{{else}}Folder{{end}} · {{.Count}} file{{if ne .Count 1}}s{{end}} · {{end}}{{.Size}}</p>
     </div>
   </section>
   <a class="primary" href="/d/{{.Token}}/file" download>Download</a>

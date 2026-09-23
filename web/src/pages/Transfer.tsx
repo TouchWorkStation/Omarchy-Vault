@@ -48,6 +48,11 @@ export function Transfer({ id }: { id: string }) {
   if (!link) return <Loading what="the code" />;
   const t = titles[link.kind] ?? titles.upload;
   const up = link.kind === "upload";
+  // Files sent from anywhere on this computer (copied in the file manager).
+  const local = !up && (link.path ?? "").startsWith("/");
+  const what = local
+    ? (link.path ?? "").split("\n").map((p) => p.split("/").pop()).join(", ")
+    : link.path;
 
   async function stop() {
     try {
@@ -85,7 +90,7 @@ export function Transfer({ id }: { id: string }) {
       <header className="transfer-head">
         <h1>{t.title}</h1>
         <p className="subtitle">
-          {t.dir} · {up ? `into ${link.folder}` : link.path}
+          {t.dir} · {up ? `into ${link.folder}` : what}
           {link.has_password && " · password protected"}
         </p>
       </header>
@@ -149,7 +154,7 @@ export function Transfer({ id }: { id: string }) {
           <button className="btn btn-danger" onClick={stop}>
             Stop
           </button>
-        ) : link.kind !== "share" ? (
+        ) : link.kind !== "share" && !local ? (
           <button className="btn btn-primary" onClick={again}>
             New code
           </button>

@@ -243,6 +243,8 @@ One Vault folder for the picker: `{ "path", "entries": [{ "name", "path", "dir",
 
 Body: `{ "path": "Photos/2024/beach.jpg", "minutes": 10, "max_downloads": 1, "client": "dashboard" }`. `path` is a file or folder inside the Vault (a folder downloads as `<name>.zip`). `minutes` 1–60 (default `preferences.download_expiry_minutes`), `max_downloads` 1–10 (default `preferences.download_max_count`). Returns the same link view as uploads, with `kind: "download"`, `path` and a `/d/<token>` URL.
 
+**Files outside the Vault:** `{ "local_paths": ["/home/you/Desktop/report.pdf", "/home/you/Pictures/Trip"] }` instead of `path` sends files from anywhere on this computer (several items or a folder as one zip). Only a request carrying the local owner token (`X-Vault-Token`, i.e. `vaultctl`) may do this; any browser session gets `403 local_only`. Symlinks, private locations (`~/.ssh`, `~/.gnupg`, `~/.password-store`, keyrings, Vault's config, `/etc`, `/proc`, `/sys`, `/dev`, `/run`, `/boot`, `/root`) and folders containing them are refused (`403 private`). At most 200 items.
+
 Errors: `404 not_found` (no such file, or not yours to read), `400 not_plain` (a symlink or special file), `400 too_many_files` (folder with more than 20 000 files), `409 storage_not_ready`, `503 no_network`.
 
 #### `POST /api/share` (admin, or family for folders they can open)

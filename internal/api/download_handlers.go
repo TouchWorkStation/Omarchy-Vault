@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -209,10 +210,14 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request, n transfer.NewSes
 
 // DownloadSessionRequest is the body of POST /api/download-session.
 type DownloadSessionRequest struct {
-	Path         string `json:"path"`
-	Minutes      int    `json:"minutes"`
-	MaxDownloads int    `json:"max_downloads"`
-	Client       string `json:"client"`
+	Path string `json:"path"`
+	// LocalPaths sends files from anywhere on this computer (absolute
+	// paths) instead of a Vault path. Only the owner's local token (vaultctl)
+	// may use it; a browser session never can.
+	LocalPaths   []string `json:"local_paths,omitempty"`
+	Minutes      int      `json:"minutes"`
+	MaxDownloads int      `json:"max_downloads"`
+	Client       string   `json:"client"`
 }
 
 func (s *Server) handleCreateDownload(w http.ResponseWriter, r *http.Request) {
@@ -225,9 +230,18 @@ func (s *Server) handleCreateDownload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "The request could not be read.")
 		return
 	}
-	rel, ok := s.resolveOffer(w, r, req.Path, false)
-	if !ok {
-		return
+	var rel, folder string
+	if len(req.LocalPaths) > 0 {
+		var ok bool
+		if rel, ok = s.resolveLocal(w, r, req.LocalPaths); !ok {
+			return
+		}
+	} else {
+		var ok bool
+		if rel, ok = s.resolveOffer(w, r, req.Path, false); !ok {
+			return
+		}
+		folder = transfer.TopFolder(rel)
 	}
 	cfg := s.config()
 	minutes := req.Minutes
@@ -245,7 +259,7 @@ func (s *Server) handleCreateDownload(w http.ResponseWriter, r *http.Request) {
 		client = "dashboard"
 	}
 	s.issue(w, r, transfer.NewSession{
-		Kind: transfer.KindDownload, Folder: transfer.TopFolder(rel), Path: rel, Client: client,
+		Kind: transfer.KindDownload, Folder: folder, Path: rel, Client: client,
 		TTL: time.Duration(minutes) * time.Minute, MaxFiles: count, MaxBytes: transfer.NoByteLimit,
 	})
 }
@@ -366,4 +380,53 @@ func (s *Server) handleStopLink(kind transfer.Kind) http.HandlerFunc {
 		sess, _ = s.Transfers.Get(r.Context(), sess.ID)
 		writeJSON(w, http.StatusOK, s.linkView(r.Context(), sess, false))
 	}
+}
+
+// maxLocalItems caps how many copied files one link sends.
+const maxLocalItems = 200
+
+// resolveLocal checks files the owner wants to send from this computer
+// and returns them as a session path (one absolute path per line).
+func (s *Server) resolveLocal(w http.ResponseWriter, r *http.Request, paths []string) (string, bool) {
+	if s.Auth == nil || !s.Auth.CheckToken(r.Header.Get(auth.HeaderToken)) {
+		writeError(w, http.StatusForbidden, "local_only", "Files outside the Vault can only be sent from this computer's keyboard shortcut or vaultctl.")
+		return "", false
+	}
+	if len(paths) > maxLocalItems {
+		writeError(w, http.StatusBadRequest, "too_many_files", "Copy fewer items at once, or copy their folder.")
+		return "", false
+	}
+	home, _ := os.UserHomeDir()
+	seen := map[string]bool{}
+	var clean []string
+	for _, p := range paths {
+		c, info, err := transfer.CheckLocal(p, home)
+		switch {
+		case errors.Is(err, transfer.ErrPrivate):
+			writeError(w, http.StatusForbidden, "private", p+" holds private keys or settings; Vault won't send it.")
+			return "", false
+		case errors.Is(err, transfer.ErrNotPlain):
+			writeError(w, http.StatusBadRequest, "not_plain", p+" is a link or special file and can't be sent.")
+			return "", false
+		case err != nil:
+			writeError(w, http.StatusNotFound, "not_found", p+" doesn't exist or can't be read.")
+			return "", false
+		}
+		if info.IsDir() {
+			root, err := os.OpenRoot(filepath.Dir(c))
+			if err == nil {
+				_, _, werr := transfer.Walk(root, filepath.Base(c))
+				root.Close()
+				if errors.Is(werr, transfer.ErrTooMany) {
+					writeError(w, http.StatusBadRequest, "too_many_files", p+" has too many files. Choose a smaller folder.")
+					return "", false
+				}
+			}
+		}
+		if !seen[c] {
+			seen[c] = true
+			clean = append(clean, c)
+		}
+	}
+	return strings.Join(clean, "\n"), true
 }
