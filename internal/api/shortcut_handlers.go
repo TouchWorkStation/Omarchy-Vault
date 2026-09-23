@@ -82,6 +82,10 @@ func (s *Server) handleSaveShortcuts(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "unchecked", "No Hyprland configuration was found, so Vault can't check for conflicts and won't add shortcuts.")
 		return
 	}
+	if _, err := os.Stat(s.Shortcuts.ConfigPath); err != nil {
+		writeError(w, http.StatusConflict, "no_config", "Vault couldn't find your Hyprland config file ("+s.Shortcuts.ConfigPath+"), so nothing was changed. Run `vaultctl shortcuts install` in a terminal to see the lines to add yourself.")
+		return
+	}
 	results := shortcuts.CheckAll(existing, reqs)
 	var bs []shortcuts.Planned
 	for i, res := range results {

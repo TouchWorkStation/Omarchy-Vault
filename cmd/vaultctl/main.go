@@ -215,7 +215,8 @@ func (a *app) scanner() *disks.Scanner {
 
 func (a *app) shortcutInspector() shortcuts.Inspector {
 	home, _ := os.UserHomeDir()
-	return shortcuts.Inspector{Run: a.run, ConfigPath: filepath.Join(home, ".config", "hypr", "hyprland.conf"), Home: home}
+	conf, _ := shortcuts.FindConfig(home)
+	return shortcuts.Inspector{Run: a.run, ConfigPath: conf, Home: home}
 }
 
 func (a *app) status(ctx context.Context) error {
@@ -341,6 +342,19 @@ func (a *app) shortcutsCmd(ctx context.Context, args []string) error {
 			return nil
 		}
 		bs = absoluteCommands(bs)
+		if _, err := os.Stat(insp.ConfigPath); err != nil {
+			fmt.Fprintln(a.out, "Vault couldn't find your Hyprland config file. It looked in:")
+			for _, c := range shortcuts.ConfigCandidates(insp.Home) {
+				fmt.Fprintf(a.out, "    %s\n", c)
+			}
+			fmt.Fprintln(a.out, "\nNothing was changed. To add the shortcuts yourself, put these lines in your Hyprland bindings file:")
+			fmt.Fprintln(a.out)
+			for _, b := range bs {
+				fmt.Fprintf(a.out, "    %s\n", b.Line())
+			}
+			fmt.Fprintln(a.out, "\n(Find your config with: hyprctl systeminfo | grep -i config, or ls ~/.config/hypr)")
+			return errors.New("Hyprland config not found")
+		}
 		fmt.Fprintf(a.out, "Vault will write %s:\n\n%s\n", shortcuts.IncludePath(insp.Home), shortcuts.Render(bs))
 		fmt.Fprintf(a.out, "and, if it is not there yet, add this line to %s:\n\n    %s\n\n", insp.ConfigPath, shortcuts.SourceLine())
 		if !yes && !confirm("Install these shortcuts?") {

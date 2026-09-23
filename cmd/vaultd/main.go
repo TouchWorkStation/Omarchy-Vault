@@ -82,7 +82,7 @@ func run() error {
 
 	var run sysexec.Runner = sysexec.System{Timeout: 15 * time.Second}
 	home, _ := os.UserHomeDir()
-	hyprConf := filepath.Join(home, ".config", "hypr", "hyprland.conf")
+	hyprConf, _ := shortcuts.FindConfig(home)
 	cfgPathLive := *cfgPath
 	dataLink, err := storage.DefaultLinkPath()
 	if err != nil {
