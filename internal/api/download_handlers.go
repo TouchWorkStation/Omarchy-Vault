@@ -403,7 +403,7 @@ func (s *Server) resolveLocal(w http.ResponseWriter, r *http.Request, paths []st
 		c, info, err := transfer.CheckLocal(p, home)
 		switch {
 		case errors.Is(err, transfer.ErrPrivate):
-			writeError(w, http.StatusForbidden, "private", p+" holds private keys or settings; Vault won't send it.")
+			writeError(w, http.StatusForbidden, "private", p+" is in or contains a private folder ("+privateDir(err)+"), so Vault won't send it.")
 			return "", false
 		case errors.Is(err, transfer.ErrNotPlain):
 			writeError(w, http.StatusBadRequest, "not_plain", p+" is a link or special file and can't be sent.")
@@ -429,4 +429,13 @@ func (s *Server) resolveLocal(w http.ResponseWriter, r *http.Request, paths []st
 		}
 	}
 	return strings.Join(clean, "\n"), true
+}
+
+// privateDir extracts the folder named in a transfer.ErrPrivate error.
+func privateDir(err error) string {
+	msg := err.Error()
+	if i := strings.LastIndex(msg, "("); i >= 0 && strings.HasSuffix(msg, ")") {
+		return msg[i+1 : len(msg)-1]
+	}
+	return "private keys or settings"
 }

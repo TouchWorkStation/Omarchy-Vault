@@ -102,3 +102,23 @@ func TestLocalDownloads(t *testing.T) {
 		t.Errorf("deleted = %d", w.Code)
 	}
 }
+
+func TestCheckLocalAllowsMountedDrives(t *testing.T) {
+	for p, open := range map[string]bool{
+		"/run/media/chris/USB/pic.jpg":                   true,
+		"/run/user/1000/gvfs/smb-share:server=nas/a.jpg": true,
+		"/run/user/1000/keyring/ssh":                     false,
+		"/run/secrets/token":                             false,
+		"/run":                                           false,
+	} {
+		if got := openRun(p); got != open {
+			t.Errorf("openRun(%s) = %v, want %v", p, got, open)
+		}
+	}
+	// A private refusal names the folder responsible.
+	home := t.TempDir()
+	_, _, err := CheckLocal("/etc/passwd", home)
+	if !errors.Is(err, ErrPrivate) || !strings.Contains(err.Error(), "/etc") {
+		t.Errorf("err = %v", err)
+	}
+}

@@ -45,6 +45,18 @@ func private(home string) []string {
 
 func within(p, dir string) bool { return p == dir || strings.HasPrefix(p, dir+"/") }
 
+// openRun reports whether p is inside /run but somewhere the file manager
+// puts ordinary files: drives it mounts (/run/media/<user>/...) and network
+// folders (/run/user/<uid>/gvfs/...). The rest of /run holds runtime state
+// and stays private.
+func openRun(p string) bool {
+	if strings.HasPrefix(p, "/run/media/") {
+		return true
+	}
+	parts := strings.Split(p, "/") // "", "run", "user", uid, "gvfs", ...
+	return len(parts) > 5 && parts[1] == "run" && parts[2] == "user" && parts[4] == "gvfs"
+}
+
 // CheckLocal validates an absolute path the owner wants to send: it must
 // be a plain file or folder (not a symlink), outside private locations,
 // and not a folder that contains one (such as the whole home folder).
@@ -57,8 +69,8 @@ func CheckLocal(p, home string) (string, fs.FileInfo, error) {
 		return "", nil, ErrPrivate
 	}
 	for _, d := range private(home) {
-		if within(p, d) || within(d, p) {
-			return "", nil, ErrPrivate
+		if (within(p, d) && !openRun(p)) || within(d, p) {
+			return "", nil, fmt.Errorf("%w (%s)", ErrPrivate, d)
 		}
 	}
 	root, err := os.OpenRoot(filepath.Dir(p))
