@@ -1176,3 +1176,16 @@ main.off {
 .segmented button.on { background: var(--accent-soft); color: var(--accent); }
 .share-url { display: flex; gap: 8px; align-items: center; margin: 8px auto 0; width: 100%; max-width: 520px; }
 .share-url input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); }
+
+/* Shortcut editor */
+.sc-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 10px; }
+.sc-row { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; background: var(--surface-2); }
+.sc-row.off { opacity: 0.7; }
+.sc-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sc-on { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.sc-on input { width: 18px; height: 18px; accent-color: var(--accent); }
+.sc-keys { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.sc-keys select { font: inherit; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--ink-strong); }
+.chip { font: inherit; font-size: 13px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--ink-muted); cursor: pointer; }
+.chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.sc-note { margin: 10px 0 0; font-size: 13px; color: var(--warn); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

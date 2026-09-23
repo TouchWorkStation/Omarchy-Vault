@@ -111,6 +111,7 @@ func run() error {
 		if hyprConf, err = demo.HyprConfig(sb.Dir); err != nil {
 			return err
 		}
+		home = sb.Dir // demo shortcuts are written inside the sandbox
 	}
 
 	token, err := auth.LoadOrCreateToken(secretsDir)

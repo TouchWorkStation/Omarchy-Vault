@@ -395,15 +395,5 @@ func absoluteCommands(bs []shortcuts.Planned) []shortcuts.Planned {
 	if real, err := filepath.EvalSymlinks(exe); err == nil && filepath.Base(real) == "vaultctl" {
 		exe = real
 	}
-	if strings.ContainsAny(exe, " '\"\\$`;&|<>(){}") {
-		return bs // unusual path: keep the plain command rather than quote it
-	}
-	out := make([]shortcuts.Planned, len(bs))
-	for i, b := range bs {
-		if rest, ok := strings.CutPrefix(b.Command, "vaultctl "); ok {
-			b.Command = exe + " " + rest
-		}
-		out[i] = b
-	}
-	return out
+	return shortcuts.WithCommandPath(bs, exe)
 }

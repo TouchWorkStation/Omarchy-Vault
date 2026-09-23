@@ -27,6 +27,18 @@ Vault uses the Vault's point of view:
 
 5. **Install (never automatic).** After the user confirms, Vault writes only its own file, `~/.config/hypr/omarchy-vault.conf`, and adds one `source = ~/.config/hypr/omarchy-vault.conf` line to the user's `hyprland.conf` after showing it. It never edits Omarchy's or Beam's binding files and never removes a binding. Uninstalling removes the Vault file and that one line.
 
+## Choose your own keys (dashboard)
+
+**Settings → Keyboard shortcuts** lets you try different keys for each action:
+
+1. Tick the actions you want. Pick modifiers (Super, Shift, Ctrl, Alt) and a key (A–Z, 0–9, F1–F12).
+2. Each choice is checked against your Hyprland bindings as you go: **Free**, **Taken** (with who uses it and a one-click free alternative), or **Used twice**.
+3. **Save shortcuts** writes them (only if every one is free) and Hyprland picks them up at once. **Remove Vault's shortcuts** takes them all out again.
+
+Only Vault's own file and its one `source` line are ever written. The browser sends only which action and which keys; the command for each action is fixed inside Vault, and keys are limited to the list above, so nothing else can end up in your Hyprland config. At least one of Super, Ctrl or Alt is required so a shortcut can't fire while you type.
+
+Super shortcuts can't be tried inside the page itself (Hyprland handles them before the browser sees them): save, then press them.
+
 ## Check
 
 ```sh

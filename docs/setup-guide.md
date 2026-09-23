@@ -360,7 +360,7 @@ vaultctl shortcuts             # check: which are free, which are taken and by w
 vaultctl shortcuts install     # shows exactly what it will write, then asks
 ```
 
-A shortcut that's already used (by Omarchy, Beam or you) is **skipped, never replaced**. To use Vault's suggested free alternative instead (e.g. Super + Alt + U), run `vaultctl shortcuts install --use-suggestions`. To undo everything: `vaultctl shortcuts remove`. Details: [shortcuts.md](shortcuts.md).
+Prefer other keys? Open **Settings → Keyboard shortcuts** in the dashboard: pick modifiers and a key for each action, see straight away whether it's free, and save. A shortcut that's already used (by Omarchy, Beam or you) is **never replaced**. To use Vault's suggested free alternative instead (e.g. Super + Alt + U), run `vaultctl shortcuts install --use-suggestions`. To undo everything: `vaultctl shortcuts remove`. Details: [shortcuts.md](shortcuts.md).
 
 ---
 

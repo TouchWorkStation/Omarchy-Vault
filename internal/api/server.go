@@ -163,6 +163,9 @@ func (s *Server) Handler() http.Handler {
 	route("GET", "disks", s.gate(admin, s.handleDisks))
 	route("GET", "settings", s.gate(admin, s.handleSettings))
 	route("GET", "shortcuts", s.gate(admin, s.handleShortcuts))
+	route("POST", "shortcuts/check", s.gate(admin, s.handleCheckShortcuts))
+	route("POST", "shortcuts", s.gate(admin, s.handleSaveShortcuts))
+	route("DELETE", "shortcuts", s.gate(admin, s.handleRemoveShortcuts))
 	route("GET", "services", s.gate(admin, s.handleServices))
 	route("POST", "pool", s.gate(admin, s.handleAdopt))
 	route("DELETE", "pool", s.gate(admin, s.handleForget))
@@ -308,8 +311,16 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		resp.Warnings = append(resp.Warnings, inv.Warnings...)
 	}
 	rep := s.Shortcuts.Analyze(ctx)
+	mine := map[string]string{} // keys the user saved in the editor
+	for _, p := range shortcuts.Installed(s.Shortcuts.Home) {
+		mine[p.ID] = p.Combo()
+	}
 	for _, c := range rep.Checks {
-		resp.Shortcuts = append(resp.Shortcuts, ShortcutStatusBrief{ID: c.ID, Label: c.Label, Combo: c.Combo, Status: c.Status})
+		b := ShortcutStatusBrief{ID: c.ID, Label: c.Label, Combo: c.Combo, Status: c.Status}
+		if combo, ok := mine[c.ID]; ok {
+			b.Combo, b.Status = combo, "installed"
+		}
+		resp.Shortcuts = append(resp.Shortcuts, b)
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -383,10 +394,6 @@ func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {
 	}
 	s.mu.RUnlock()
 	writeJSON(w, http.StatusOK, resp)
-}
-
-func (s *Server) handleShortcuts(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.Shortcuts.Analyze(r.Context()))
 }
 
 func (s *Server) handleServices(w http.ResponseWriter, r *http.Request) {

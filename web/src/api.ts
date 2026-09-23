@@ -227,6 +227,8 @@ export interface ShortcutCheck {
   id: string;
   label: string;
   direction: string;
+  mods: string[];
+  key: string;
   combo: string;
   binding_line: string;
   status: ShortcutBrief["status"];
@@ -240,6 +242,29 @@ export interface ShortcutReport {
   checks: ShortcutCheck[];
   warnings?: string[];
   installed: boolean;
+}
+
+export interface PlannedShortcut {
+  id: string;
+  label: string;
+  mods: string[];
+  key: string;
+}
+
+export interface ShortcutEditorState extends ShortcutReport {
+  current: PlannedShortcut[];
+  mod_choices: string[];
+  key_choices: string[];
+  file: string;
+}
+
+export interface ShortcutResult {
+  id: string;
+  combo: string;
+  status: "available" | "conflict" | "duplicate" | "invalid";
+  message?: string;
+  conflicts?: Binding[];
+  suggestion?: { mods: string[]; key: string };
 }
 
 export interface SettingsResponse {

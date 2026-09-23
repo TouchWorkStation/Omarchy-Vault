@@ -227,38 +227,8 @@ type Inspector struct {
 // Analyze collects existing bindings from the running compositor and from
 // config files, then checks each planned shortcut against them.
 func (in Inspector) Analyze(ctx context.Context) Report {
-	rep := Report{Sources: []string{}}
-	var all []Binding
-
-	if in.Run != nil && in.Run.Available("hyprctl") {
-		out, err := in.Run.Output(ctx, "hyprctl", "binds", "-j")
-		if err == nil {
-			bs, perr := parseHyprctl(out)
-			if perr == nil {
-				all = append(all, bs...)
-				rep.Sources = append(rep.Sources, "hyprctl")
-			} else {
-				rep.Warnings = append(rep.Warnings, "Could not read bindings from Hyprland.")
-			}
-		} else {
-			rep.Warnings = append(rep.Warnings, "Hyprland is not running in this session; checked config files only.")
-		}
-	}
-
-	if in.ConfigPath != "" {
-		bs, files, warns := parseConfigTree(in.ConfigPath, in.Home)
-		rep.Warnings = append(rep.Warnings, warns...)
-		if len(files) > 0 {
-			all = append(all, bs...)
-			rep.Sources = append(rep.Sources, files...)
-		}
-	}
-
+	all, rep := in.collect(ctx)
 	known := len(rep.Sources) > 0
-	if !known {
-		rep.Warnings = append(rep.Warnings, "No Hyprland configuration was found, so conflicts cannot be ruled out. Vault will not install shortcuts until it can check.")
-	}
-
 	for _, p := range Plan() {
 		c := Check{Planned: p, Combo: p.Combo(), Line: p.Line()}
 		for _, b := range all {
@@ -288,6 +258,42 @@ func (in Inspector) Analyze(ctx context.Context) Report {
 		rep.Checks = append(rep.Checks, c)
 	}
 	return rep
+}
+
+// collect gathers existing bindings from the running compositor and from
+// config files.
+func (in Inspector) collect(ctx context.Context) ([]Binding, Report) {
+	rep := Report{Sources: []string{}}
+	var all []Binding
+
+	if in.Run != nil && in.Run.Available("hyprctl") {
+		out, err := in.Run.Output(ctx, "hyprctl", "binds", "-j")
+		if err == nil {
+			bs, perr := parseHyprctl(out)
+			if perr == nil {
+				all = append(all, bs...)
+				rep.Sources = append(rep.Sources, "hyprctl")
+			} else {
+				rep.Warnings = append(rep.Warnings, "Could not read bindings from Hyprland.")
+			}
+		} else {
+			rep.Warnings = append(rep.Warnings, "Hyprland is not running in this session; checked config files only.")
+		}
+	}
+
+	if in.ConfigPath != "" {
+		bs, files, warns := parseConfigTree(in.ConfigPath, in.Home)
+		rep.Warnings = append(rep.Warnings, warns...)
+		if len(files) > 0 {
+			all = append(all, bs...)
+			rep.Sources = append(rep.Sources, files...)
+		}
+	}
+
+	if len(rep.Sources) == 0 {
+		rep.Warnings = append(rep.Warnings, "No Hyprland configuration was found, so conflicts cannot be ruled out. Vault will not install shortcuts until it can check.")
+	}
+	return all, rep
 }
 
 func isOurs(b Binding, p Planned) bool {

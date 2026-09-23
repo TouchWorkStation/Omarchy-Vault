@@ -104,6 +104,9 @@ func Install(home, hyprlandConf string, bs []Planned) (bool, error) {
 	if existing, err := os.ReadFile(inc); err == nil && !strings.HasPrefix(string(existing), fileHeader) {
 		return false, fmt.Errorf("%s exists and was not written by Vault; leaving it alone", inc)
 	}
+	if err := os.MkdirAll(filepath.Dir(inc), 0o755); err != nil {
+		return false, err
+	}
 	if err := writeAtomic(inc, Render(bs)); err != nil {
 		return false, err
 	}

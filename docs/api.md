@@ -195,6 +195,15 @@ Shortcut plan and conflict analysis. See [shortcuts.md](shortcuts.md).
                 "options": ["choose_another", "copy_binding", "skip"] } ] }
 ```
 
+### Shortcut editor (admin)
+
+- `GET /api/shortcuts`: the conflict report for Vault's default keys, plus `current` (what is saved now), `mod_choices`, `key_choices` and `file`.
+- `POST /api/shortcuts/check` `{ "bindings": [{ "id": "upload", "mods": ["SUPER","ALT"], "key": "U" }] }`: checks without changing anything. Each result is `available`, `conflict` (with `conflicts` and a free `suggestion`), `duplicate` or `invalid`.
+- `POST /api/shortcuts` (same body): saves them. Refused with `409` unless every one is free; an empty list removes them.
+- `DELETE /api/shortcuts`: removes Vault's shortcuts and its `source` line.
+
+`id` is one of `open`, `upload`, `download`; the command is fixed per id. Modifiers are SUPER/SHIFT/CTRL/ALT (at least one of SUPER, CTRL, ALT); keys A–Z, 0–9, F1–F12.
+
 ### `GET /api/services`
 
 Which supporting tools and units are present (read-only).

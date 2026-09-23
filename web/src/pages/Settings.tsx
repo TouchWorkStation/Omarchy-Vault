@@ -1,7 +1,7 @@
-import type { Service, SettingsResponse, ShortcutReport, Status } from "../api";
-import { Badge, Card, Kbd, Loading, Notice } from "../components/ui";
+import type { Service, SettingsResponse, Status } from "../api";
+import { Badge, Card, Loading, Notice } from "../components/ui";
+import { ShortcutEditor } from "../components/ShortcutEditor";
 import { useApi } from "../useApi";
-import { useState } from "react";
 
 function ServiceRow({ s, current }: { s: Service; current: number }) {
   let badge;
@@ -23,67 +23,6 @@ function ServiceRow({ s, current }: { s: Service; current: number }) {
   );
 }
 
-function CopyButton({ text }: { text: string }) {
-  const [done, setDone] = useState(false);
-  return (
-    <button
-      className="btn btn-small"
-      onClick={() => {
-        navigator.clipboard?.writeText(text).then(() => {
-          setDone(true);
-          window.setTimeout(() => setDone(false), 1500);
-        });
-      }}
-    >
-      {done ? "Copied" : "Copy Binding Command"}
-    </button>
-  );
-}
-
-function Shortcuts() {
-  const { data } = useApi<ShortcutReport>("/api/shortcuts");
-  if (!data) return <Loading what="shortcuts" />;
-  return (
-    <>
-      <ul className="shortcut-detail">
-        {data.checks.map((c) => (
-          <li key={c.id}>
-            <div className="shortcut-row">
-              <div>
-                <div>{c.label}</div>
-                {c.direction && <div className="muted small">{c.direction}</div>}
-              </div>
-              <Kbd combo={c.combo} />
-            </div>
-            {c.status === "conflict" && (
-              <div className="conflict">
-                <p>
-                  <strong>Shortcut Conflict</strong> — {c.combo} is already assigned to{" "}
-                  {c.conflicts?.map((b) => b.description || `${b.dispatcher} ${b.arg ?? ""}`).join(", ")}.
-                </p>
-                <p className="muted small">
-                  Options: Choose Another Shortcut
-                  {c.suggestion ? ` (for example ${[...c.suggestion.mods, c.suggestion.key].map((x) => x[0] + x.slice(1).toLowerCase()).join(" + ")})` : ""} ·
-                  Copy Binding Command · Skip Shortcut
-                </p>
-                <CopyButton text={c.binding_line} />
-              </div>
-            )}
-            {c.status === "available" && <p className="muted small">Free. Vault can add it when shortcuts are installed (Milestone 4).</p>}
-            {c.status === "installed" && <p className="muted small">Installed and working.</p>}
-            {c.status === "unknown" && <p className="muted small">Could not check this computer's Hyprland config.</p>}
-          </li>
-        ))}
-      </ul>
-      {data.warnings?.map((w) => (
-        <p key={w} className="muted small">
-          ! {w}
-        </p>
-      ))}
-    </>
-  );
-}
-
 export function Settings() {
   const { data, error } = useApi<SettingsResponse>("/api/settings");
   const { data: status } = useApi<Status>("/api/status");
@@ -93,14 +32,14 @@ export function Settings() {
       <header className="page-head">
         <div>
           <h1>SETTINGS</h1>
-          <p className="subtitle">Read-only in this version</p>
+          <p className="subtitle">Shortcuts and how Vault is set up</p>
         </div>
       </header>
       {error && <Notice tone="bad">{error}</Notice>}
       {data?.config_error && <Notice tone="bad">Settings file problem: {data.config_error}</Notice>}
 
-      <Card title="SHORTCUTS">
-        <Shortcuts />
+      <Card title="KEYBOARD SHORTCUTS">
+        <ShortcutEditor />
       </Card>
 
       <div className="two-col">
