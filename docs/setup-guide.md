@@ -186,6 +186,16 @@ If your drive is missing or not usable, see [Troubleshooting](#11-troubleshootin
 
 ## 3. Install Vault
 
+**The quick way.** Make sure your drive is mounted (section 2; clicking it in the Files app is enough), then:
+
+```sh
+sudo pacman -S --needed git && git clone https://github.com/TouchWorkStation/Omarchy-Vault.git ~/Omarchy-Vault && ~/Omarchy-Vault/scripts/install.sh --express
+```
+
+This does everything below plus sections 7 and 8's one-time steps (shortcuts, firewall rule for your home network) and opens the setup screen (section 4). Add `--with-files` to also build Files (section 5).
+
+**Or step by step:**
+
 ```sh
 sudo pacman -S --needed git go npm base-devel smartmontools
 git clone https://github.com/TouchWorkStation/Omarchy-Vault.git ~/Omarchy-Vault

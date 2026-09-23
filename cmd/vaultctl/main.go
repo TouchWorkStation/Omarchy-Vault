@@ -340,6 +340,7 @@ func (a *app) shortcutsCmd(ctx context.Context, args []string) error {
 			fmt.Fprintln(a.out, "Nothing to install. Try --use-suggestions to use a free alternative.")
 			return nil
 		}
+		bs = absoluteCommands(bs)
 		fmt.Fprintf(a.out, "Vault will write %s:\n\n%s\n", shortcuts.IncludePath(insp.Home), shortcuts.Render(bs))
 		fmt.Fprintf(a.out, "and, if it is not there yet, add this line to %s:\n\n    %s\n\n", insp.ConfigPath, shortcuts.SourceLine())
 		if !yes && !confirm("Install these shortcuts?") {
@@ -381,4 +382,28 @@ func logs(args []string) error {
 	cmd := exec.Command(path, jargs...)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	return cmd.Run()
+}
+
+// absoluteCommands points shortcuts at this vaultctl by full path:
+// Hyprland runs them with the session's PATH, which may not include
+// ~/.local/bin.
+func absoluteCommands(bs []shortcuts.Planned) []shortcuts.Planned {
+	exe, err := os.Executable()
+	if err != nil || filepath.Base(exe) != "vaultctl" {
+		return bs
+	}
+	if real, err := filepath.EvalSymlinks(exe); err == nil && filepath.Base(real) == "vaultctl" {
+		exe = real
+	}
+	if strings.ContainsAny(exe, " '\"\\$`;&|<>(){}") {
+		return bs // unusual path: keep the plain command rather than quote it
+	}
+	out := make([]shortcuts.Planned, len(bs))
+	for i, b := range bs {
+		if rest, ok := strings.CutPrefix(b.Command, "vaultctl "); ok {
+			b.Command = exe + " " + rest
+		}
+		out[i] = b
+	}
+	return out
 }

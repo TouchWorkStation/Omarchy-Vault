@@ -57,15 +57,23 @@ It is **not** a replacement for TrueNAS, Unraid or ZimaOS. Vault uses the drives
 
 ## Quick start
 
-Requirements: Omarchy or Arch Linux with `git go npm base-devel` (the installer offers to install them). Optional: `smartmontools` for drive health. You also need a second drive that is mounted; see [preparing your drive](docs/setup-guide.md#2-prepare-your-drive).
+**One command** (Omarchy / Arch). Plug in your drive and click it in the Files app sidebar so it's mounted, then paste this into a terminal:
+
+```sh
+sudo pacman -S --needed git && git clone https://github.com/TouchWorkStation/Omarchy-Vault.git ~/Omarchy-Vault && ~/Omarchy-Vault/scripts/install.sh --express
+```
+
+It installs what it needs, builds Vault, allows phones on your home network to reach it (port 8790, your network only), adds Super+Shift+V/U/D (only if free) and opens the setup screen: pick your drive, create your account, done. It asks for your password for `sudo` a couple of times. Add `--with-files` to also build the Files browser.
+
+Prefer to go step by step?
 
 ```sh
 git clone https://github.com/TouchWorkStation/Omarchy-Vault.git ~/Omarchy-Vault
 cd ~/Omarchy-Vault
-
 ./scripts/install.sh --dry-run   # see exactly what will happen
-./scripts/install.sh             # build Vault + the file service, install for your user
+./scripts/install.sh             # asks before each optional step
 vaultctl setup                   # turns Vault on, then choose your drive and create your account
+vaultctl shortcuts install       # Super+Shift+V/U/D, only the free ones
 ```
 
 Vault **only runs when you turn it on**. Nothing starts at login or boot.

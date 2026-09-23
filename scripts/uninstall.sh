@@ -24,6 +24,14 @@ if [[ -f "$HYPR_DIR/omarchy-vault.conf" && -x "$HOME/.local/bin/vaultctl" ]]; th
   run "$HOME/.local/bin/vaultctl" shortcuts remove --yes || true
 fi
 
+# The firewall rule the express installer added (home network only).
+if [[ -f "$DATA_DIR/ufw-subnet" ]] && command -v ufw >/dev/null; then
+  SUBNET="$(cat "$DATA_DIR/ufw-subnet")"
+  echo "==> Removing the firewall rule for $SUBNET (needs sudo)"
+  run sudo ufw delete allow from "$SUBNET" to any port 8790 proto tcp || true
+  [[ $DRY_RUN -eq 1 ]] || rm -f "$DATA_DIR/ufw-subnet"
+fi
+
 echo "==> Removing programs and service"
 for f in "$HOME/.local/bin/vaultd" "$HOME/.local/bin/vaultctl" "$UNIT"; do
   [[ -e "$f" ]] && run rm -f "$f"

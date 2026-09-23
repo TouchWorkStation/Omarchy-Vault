@@ -2,23 +2,31 @@
 # Omarchy Vault installer.
 #
 # Every action is printed before it runs. Nothing here touches your drives:
-# no formatting, partitioning, mounting or fstab edits. Keybindings are only
-# checked, never written.
+# no formatting, partitioning, mounting or fstab edits.
 #
-#   ./scripts/install.sh            install for the current user
-#   ./scripts/install.sh --dry-run  show what would happen, change nothing
-#   ./scripts/install.sh --yes      answer "yes" to optional prompts
+#   ./scripts/install.sh              install for the current user (asks)
+#   ./scripts/install.sh --express    everything in one go: packages, build,
+#                                     /srv/vault, firewall rule for your home
+#                                     network, free shortcuts, then setup
+#   ./scripts/install.sh --with-files also build the Files browser (SFTPGo;
+#                                     a few minutes, ~60 MB RAM while on)
+#   ./scripts/install.sh --dry-run    show what would happen, change nothing
+#   ./scripts/install.sh --yes        answer "yes" to optional prompts
 set -euo pipefail
 
 DRY_RUN=0
 ASSUME_YES=0
 NO_BUILD=0
+EXPRESS=0
+WITH_FILES=0
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
     --yes|-y) ASSUME_YES=1 ;;
+    --express) EXPRESS=1; ASSUME_YES=1 ;;
+    --with-files) WITH_FILES=1 ;;
     --no-build) NO_BUILD=1 ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -111,7 +119,7 @@ if [[ -x "$DATA_DIR/sftpgo/bin/sftpgo" ]]; then
   note "SFTPGo already installed in $DATA_DIR/sftpgo"
 elif command -v sftpgo >/dev/null && [[ -d /usr/share/sftpgo/templates ]]; then
   note "Using the system SFTPGo ($(command -v sftpgo))"
-elif ask "Build the file service (SFTPGo v2.7.6) now? It takes a few minutes."; then
+elif [[ $WITH_FILES -eq 1 ]] || { [[ $EXPRESS -eq 0 ]] && ask "Build the file service (SFTPGo v2.7.6) now? It takes a few minutes."; }; then
   run "$REPO/scripts/build-sftpgo.sh" "$DATA_DIR/sftpgo"
 else
   note "Skipped. Files stays off until you run: ./scripts/build-sftpgo.sh"
@@ -180,13 +188,45 @@ for f in "$REPO"/plugin/qml/*.qml; do
   run install -m 0644 "$f" "$DATA_DIR/plugin/qml/$(basename "$f")"
 done
 
-# 10. Shortcuts: check only. Installing them is a separate, explicit step
-# (vaultctl shortcuts install) that never overwrites an existing binding.
-say "Checking shortcuts (nothing is changed)"
-if [[ $DRY_RUN -eq 0 ]]; then
-  "$BIN_DIR/vaultctl" shortcuts || true
+# 10. Firewall: phones reach Vault on port 8790 (only while a QR code is
+# showing). Allow it from your home network only, never from anywhere.
+say "Firewall (phone transfers, port 8790)"
+# The home network is the private subnet on the interface of the default
+# route (so Docker or VPN interfaces are never picked).
+lan_subnet() {
+  awk '
+    $1 == "default" { for (i = 1; i < NF; i++) if ($i == "dev") dev = $(i + 1) }
+    $0 ~ /proto kernel/ { for (i = 1; i < NF; i++) if ($i == "dev") net[$(i + 1)] = $1 }
+    END {
+      s = net[dev]
+      if (s ~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/) print s
+    }'
+}
+SUBNET="$(ip -4 route 2>/dev/null | lan_subnet || true)"
+if ! command -v ufw >/dev/null; then
+  note "ufw not installed; nothing to do."
+elif [[ -z "$SUBNET" ]]; then
+  warn "Not connected to a home network right now; skipped."
+  note "Later: sudo ufw allow from <your network, e.g. 192.168.1.0/24> to any port 8790 proto tcp"
+elif ask "Allow phones on $SUBNET to reach Vault's transfer port 8790 (needs sudo)?"; then
+  run sudo ufw allow from "$SUBNET" to any port 8790 proto tcp comment "Omarchy Vault phone transfers"
+  [[ $DRY_RUN -eq 1 ]] || { install -d "$DATA_DIR"; echo "$SUBNET" > "$DATA_DIR/ufw-subnet"; }
 else
-  note "+ vaultctl shortcuts"
+  note "Skipped. Later: sudo ufw allow from $SUBNET to any port 8790 proto tcp"
+fi
+
+# 11. Shortcuts. Only free ones are ever added; an existing binding is
+# never replaced (see docs/shortcuts.md).
+if [[ $EXPRESS -eq 1 ]]; then
+  say "Adding keyboard shortcuts (free ones only)"
+  run "$BIN_DIR/vaultctl" shortcuts install --yes || warn "Shortcuts not added; run: vaultctl shortcuts"
+else
+  say "Checking shortcuts (nothing is changed)"
+  if [[ $DRY_RUN -eq 0 ]]; then
+    "$BIN_DIR/vaultctl" shortcuts || true
+  else
+    note "+ vaultctl shortcuts"
+  fi
 fi
 
 say "Done"
@@ -196,7 +236,7 @@ cat <<MSG
     Set up storage:    vaultctl setup          (turns Vault on, opens the setup screens)
     Open Vault:        vaultctl open           (turns Vault on, http://127.0.0.1:8788)
     Phone → Vault:     vaultctl upload         (QR code; phone on the same Wi-Fi)
-    Add shortcuts:     vaultctl shortcuts install   (Super+Shift+V, Super+Shift+U)
+    Add shortcuts:     vaultctl shortcuts install   (Super+Shift+V/U/D)
 
     Vault never runs by itself: nothing starts at login or boot.
     Check everything:  vaultctl doctor
@@ -205,3 +245,11 @@ cat <<MSG
     Vault never formats, partitions or erases drives, and never overwrites
     an existing keyboard shortcut.
 MSG
+
+# 12. Express: go straight to the setup screen.
+if [[ $EXPRESS -eq 1 && $DRY_RUN -eq 0 ]]; then
+  say "Opening the setup screen"
+  note "Pick your drive, create your account, done."
+  note "Drive not listed? Click it in the Files app sidebar to mount it, then press Refresh."
+  "$BIN_DIR/vaultctl" setup || warn "Could not open setup; run: vaultctl setup"
+fi
