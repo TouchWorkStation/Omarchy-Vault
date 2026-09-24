@@ -43,7 +43,9 @@ Things it never does: format, partition or mount drives; edit `/etc/fstab`; run 
 
 **The plugin checkout stays pristine.** Building inside `~/.config/omarchy/plugins/` would create `node_modules` symlinks (which the shell refuses) and untracked files (which would get in the way of `omarchy plugin update`). So the installer builds a `git archive` copy in `~/.cache` instead. We checked that the checkout has zero changes and zero symlinks after a build, and still passes `omarchy plugin validate`.
 
-**Network use during install:** `npm ci` (pinned by `web/package-lock.json`) and Go modules (pinned by `go.sum`). The optional Files browser (`--with-files`, not part of `--express`) builds SFTPGo v2.7.6 from source and checks commit `62ae9ba3957e…` before building.
+**Network use during install:** `npm ci` (pinned by `web/package-lock.json`) and Go modules (pinned by `go.sum`). The optional Files browser (`--with-files`, not part of `--express`) builds SFTPGo v2.7.6 from source, fetched by full commit SHA `62ae9ba3957e9ed52b44a4f885e805e2d7b35972` (never by tag) and checked again before building.
+
+**No prebuilt binaries are shipped.** The repository contains only source; `vaultd` and `vaultctl` are always built on the user's machine from the checked-out commit.
 
 ## Keyboard shortcuts
 

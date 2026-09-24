@@ -82,7 +82,7 @@ The local token (`~/.config/omarchy-vault/secrets/local-token`: 32 random bytes,
 
 ## File service (SFTPGo) trust boundary (Milestone 3)
 
-- **Build:** SFTPGo v2.7.6 is built from the official repository, at a tag that must resolve to commit `62ae9ba3957e9ed52b44a4f885e805e2d7b35972`. The build refuses anything else. It installs into the user's home folder; no root is involved.
+- **Build:** SFTPGo v2.7.6 is built from the official repository, fetched by its full commit SHA `62ae9ba3957e9ed52b44a4f885e805e2d7b35972` (not by tag), and the build stops unless the checked-out commit is exactly that SHA. It installs into the user's home folder; no root is involved.
 - **Process:** vaultd runs it as a child process, as the same user, with `Pdeathsig`. It is stopped whenever storage is not ready. Its configuration comes only from environment variables set by Vault:
   - HTTP listens on 127.0.0.1:8789 only.
   - Web admin, OpenAPI, SFTP, FTP, WebDAV and telemetry are off.

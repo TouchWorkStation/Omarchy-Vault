@@ -5,8 +5,9 @@
 #   ./scripts/build-sftpgo.sh [destination]
 # Default destination: ~/.local/share/omarchy-vault/sftpgo
 #
-# The source is cloned from the official repository at a fixed tag, and the
-# build stops unless the tag resolves to the exact commit below.
+# The source is fetched from the official repository by its full commit SHA
+# (never by tag, since a tag can be moved), and the build stops unless the
+# checked-out commit is exactly that SHA.
 set -euo pipefail
 
 VERSION="v2.7.6"
@@ -29,11 +30,13 @@ fi
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-echo "==> Downloading SFTPGo $VERSION source"
-git -c advice.detachedHead=false clone --quiet --depth 1 --branch "$VERSION" "$REPO" "$tmp/src"
+echo "==> Downloading SFTPGo $VERSION source (commit $COMMIT)"
+git init --quiet "$tmp/src"
+git -C "$tmp/src" fetch --quiet --depth 1 "$REPO" "$COMMIT"
+git -C "$tmp/src" -c advice.detachedHead=false checkout --quiet "$COMMIT"
 got="$(git -C "$tmp/src" rev-parse HEAD)"
 if [[ "$got" != "$COMMIT" ]]; then
-  echo "build-sftpgo: $VERSION resolved to $got, expected $COMMIT. Refusing to build." >&2
+  echo "build-sftpgo: checked out $got, expected $COMMIT. Refusing to build." >&2
   exit 1
 fi
 
