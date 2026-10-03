@@ -153,7 +153,9 @@ Phones can't reach the dashboard (it listens on 127.0.0.1 only). While at least 
 - It binds to one address, never `0.0.0.0`: the private LAN address it detects, or the IP you set as `transfer.host` in config (loopback and `0.0.0.0` are refused). If no private network address is found, no link is created.
 - **Plain HTTP.** On your own Wi-Fi this is like any home device; someone on the same network who can capture traffic could see the token and the files. Don't use transfer or share links on untrusted Wi-Fi (cafés, hotels).
 - Strict CSP (`default-src 'none'`, own scripts and styles only), `Referrer-Policy: no-referrer` (the token is in the URL), `no-store`, framing denied.
-- Files are streamed to a hidden `.vault-partial-*` file inside the destination folder and renamed into place with `RENAME_NOREPLACE`, so an existing file is never replaced; the folder is opened through `os.Root`, so a symlink can't redirect the write. Partial files are deleted on error.
+- Files are streamed to a hidden `.vault-partial-*` file inside the destination folder, then published under their name in one atomic step that fails if the name is taken. On a clash Vault tries "name (1)", "name (2)", and so on. So an existing file, or one another upload publishes at the same moment, is never replaced. The folder is opened through `os.Root`, so a symlink can't redirect the write. Partial files are deleted on error.
+  - The atomic step is `renameat2(RENAME_NOREPLACE)`. On filesystems without it, Vault uses `linkat()` (which never replaces either), then removes the temporary name.
+  - On a filesystem with neither, the upload is refused with a clear message. There is no check-then-rename fallback.
 
 ## Web security
 

@@ -460,6 +460,10 @@ func (s *Server) saveOne(ctx context.Context, sess Session, root *os.Root, rootP
 		if errors.Is(err, ErrTooLarge) {
 			return Saved{}, "That file is larger than this link or the Vault's free space allows."
 		}
+		if errors.Is(err, ErrNoSafePublish) {
+			s.Log.Warn("upload refused: the drive's filesystem can't add files without risking a replace", "folder", sess.Folder)
+			return Saved{}, "This drive can't safely add new files, so nothing was saved. Use a drive formatted as ext4, Btrfs, exFAT or NTFS."
+		}
 		s.Log.Warn("upload failed", "err", err)
 		return Saved{}, "The file could not be saved."
 	}

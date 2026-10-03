@@ -121,7 +121,7 @@ Super+Alt+U → vaultctl upload → (turns Vault on) → POST /api/upload-sessio
    → QR: http://<LAN IP>:8790/u/<token>   (no paths in the URL)
    → vaultctl opens the Vault window at /transfer/<id> (or prints the QR with --terminal)
 Phone → GET /u/<token> (mobile page) → POST /u/<token>/files
-   → multipart parts streamed one at a time into <folder>/.vault-partial-*, renamed with RENAME_NOREPLACE
+   → multipart parts streamed one at a time into <folder>/.vault-partial-*, published with RENAME_NOREPLACE (or linkat; never a replacing rename)
    → each file recorded in vault.db (activity) → dashboard polls /api/upload-session/<id>
 Link expires / Stop → listener closes
 ```

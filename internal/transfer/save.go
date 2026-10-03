@@ -71,6 +71,29 @@ func candidate(name string, i int) string {
 // ErrTooLarge means the file exceeded the allowed size.
 var ErrTooLarge = errors.New("transfer: file too large")
 
+// ErrNoSafePublish means the destination's filesystem supports neither
+// RENAME_NOREPLACE nor hard links, so Vault cannot add a file there
+// without risking replacing one that appears at the same moment. Uploads
+// to it are refused instead.
+var ErrNoSafePublish = errors.New("transfer: this drive cannot add files without risking replacing one")
+
+// Atomic no-replace publishing primitives; tests swap them to exercise
+// the fallback.
+var (
+	renameNoReplace = func(dfd int, from, to string) error {
+		return unix.Renameat2(dfd, from, dfd, to, unix.RENAME_NOREPLACE)
+	}
+	linkNoReplace = func(dfd int, from, to string) error {
+		return unix.Linkat(dfd, from, dfd, to, 0)
+	}
+)
+
+// unsupported reports a "this filesystem can't do that" error.
+func unsupported(err error) bool {
+	return errors.Is(err, unix.EINVAL) || errors.Is(err, unix.ENOSYS) ||
+		errors.Is(err, unix.EOPNOTSUPP) || errors.Is(err, unix.EPERM)
+}
+
 // Save streams r into dir/folder under a cleaned, unique name, never
 // replacing an existing file. The data goes to a hidden temporary file
 // first and is moved into place only when complete. At most limit bytes
@@ -120,31 +143,52 @@ func Save(root *os.Root, folder, rawName string, r io.Reader, limit int64) (stri
 		return "", 0, err
 	}
 
-	dfd := int(dir.Fd())
+	final, err := publish(int(dir.Fd()), tmpName, name)
+	if err != nil {
+		root.Remove(tmpRel)
+		return "", 0, err
+	}
+	return final, n, nil
+}
+
+// publish moves the finished temporary file tmp to the first free name of
+// name, "name (1)", … in the folder dfd. Every step is a single atomic
+// operation that fails if the name is taken, so an existing file, or one
+// another upload publishes at the same moment, is never replaced:
+//
+//  1. renameat2(RENAME_NOREPLACE), on filesystems that support it;
+//  2. otherwise linkat(), which never replaces either, then unlink tmp;
+//  3. if the filesystem has neither, ErrNoSafePublish. There is no
+//     check-then-rename fallback.
+func publish(dfd int, tmp, name string) (string, error) {
+	useLink := false
 	for i := 0; i < 10000; i++ {
 		final := candidate(name, i)
-		err := unix.Renameat2(dfd, tmpName, dfd, final, unix.RENAME_NOREPLACE)
+		var err error
+		if !useLink {
+			err = renameNoReplace(dfd, tmp, final)
+			if err != nil && unsupported(err) {
+				useLink = true
+			}
+		}
+		if useLink {
+			err = linkNoReplace(dfd, tmp, final)
+			if err == nil {
+				// The file is in place under its final name; tmp is now
+				// just a second name for it.
+				_ = unix.Unlinkat(dfd, tmp, 0)
+			} else if unsupported(err) || errors.Is(err, unix.EMLINK) {
+				return "", ErrNoSafePublish
+			}
+		}
 		switch {
 		case err == nil:
-			return final, n, nil
+			return final, nil
 		case errors.Is(err, unix.EEXIST):
 			continue
-		case errors.Is(err, unix.EINVAL), errors.Is(err, unix.ENOSYS), errors.Is(err, unix.EOPNOTSUPP):
-			// Filesystems without RENAME_NOREPLACE (e.g. some FUSE/exFAT):
-			// check, then rename. Vault is the only writer here.
-			if _, statErr := root.Lstat(path.Join(folder, final)); statErr == nil {
-				continue
-			}
-			if err := unix.Renameat(dfd, tmpName, dfd, final); err != nil {
-				root.Remove(tmpRel)
-				return "", 0, err
-			}
-			return final, n, nil
 		default:
-			root.Remove(tmpRel)
-			return "", 0, err
+			return "", err
 		}
 	}
-	root.Remove(tmpRel)
-	return "", 0, errors.New("transfer: could not find a free name")
+	return "", errors.New("transfer: could not find a free name")
 }
