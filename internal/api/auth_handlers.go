@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/control"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/files"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/users"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/version"
@@ -27,6 +28,15 @@ var localIdentity = auth.Identity{Username: "local", Role: string(users.Admin), 
 // local token (first-run setup).
 func (s *Server) accountsExist() bool { return s.Users != nil && s.Users.Count() > 0 }
 
+// localToken reports whether r carries the valid local token AND arrived
+// on vaultctl's owner-only control socket. Over TCP the token is never
+// accepted: anyone on the computer can listen on 127.0.0.1:8788 while
+// Vault is off, so vaultctl never sends it there, and a token seen there
+// must not work.
+func (s *Server) localToken(r *http.Request) bool {
+	return s.Auth != nil && control.FromSocket(r) && s.Auth.CheckToken(r.Header.Get(auth.HeaderToken))
+}
+
 // identity returns who is making the request. intentOK reports whether a
 // cookie-authenticated request carried X-Vault-Request (CSRF protection).
 func (s *Server) identity(r *http.Request) (id auth.Identity, ok bool, viaCookie bool) {
@@ -38,8 +48,8 @@ func (s *Server) identity(r *http.Request) (id auth.Identity, ok bool, viaCookie
 	if s.Auth == nil {
 		return auth.Identity{}, false, false
 	}
-	if tok := r.Header.Get(auth.HeaderToken); tok != "" {
-		if s.Auth.CheckToken(tok) {
+	if r.Header.Get(auth.HeaderToken) != "" {
+		if s.localToken(r) {
 			return localIdentity, true, false
 		}
 		return auth.Identity{}, false, false
@@ -147,7 +157,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 
 // handleLocalLogin trades the local token for a single-use login code.
 func (s *Server) handleLocalLogin(w http.ResponseWriter, r *http.Request) {
-	if s.Auth == nil || !s.Auth.CheckToken(r.Header.Get(auth.HeaderToken)) {
+	if !s.localToken(r) {
 		writeError(w, http.StatusUnauthorized, "bad_token", "The Vault token is not valid.")
 		return
 	}

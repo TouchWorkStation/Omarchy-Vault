@@ -20,6 +20,7 @@ import (
 
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/config"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/control"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/disks"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/shortcuts"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
@@ -179,6 +180,30 @@ func fail(msg string) int {
 	return 2
 }
 
+// apiURL is the URL for an API request. The request always travels over
+// the control socket (see daemon); the host only satisfies Vault's Host
+// check.
+func (a *app) apiURL(path string) string { return "http://" + a.cfg.Listen + path }
+
+// daemon sends req to vaultd over its owner-only control socket, never
+// over TCP: anyone on this computer can listen on the TCP port while Vault
+// is off, and the local token must never reach them.
+func (a *app) daemon(req *http.Request) (*http.Response, error) {
+	sock, err := control.Path()
+	if err != nil {
+		return nil, err
+	}
+	resp, err := control.Client(sock, 0).Do(req)
+	if err != nil {
+		if errors.Is(err, control.ErrUnsafe) {
+			return nil, err
+		}
+		return nil, errDaemonDown
+	}
+	return resp, nil
+}
+
+// baseURL is where the browser opens Vault.
 func (a *app) baseURL() string {
 	if v := os.Getenv("VAULT_ADDR"); v != "" {
 		return strings.TrimRight(v, "/")
@@ -191,16 +216,16 @@ var errDaemonDown = errors.New("Vault is off. Turn it on with: vaultctl on")
 func (a *app) getJSON(ctx context.Context, path string, v any) error {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.baseURL()+path, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.apiURL(path), nil)
 	if err != nil {
 		return err
 	}
 	if tok, err := a.token(); err == nil {
 		req.Header.Set(auth.HeaderToken, tok)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := a.daemon(req)
 	if err != nil {
-		return errDaemonDown
+		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {

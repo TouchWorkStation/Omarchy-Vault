@@ -66,7 +66,13 @@ func (a *app) powerOn(ctx context.Context) error {
 		fmt.Fprintln(a.out, "Vault is already on.")
 		return nil
 	}
-	if out, err := systemctlUser("start", unit); err != nil {
+	// Active but not answering on the control socket: an older Vault from
+	// before the socket existed (or one that is stuck). Restart it.
+	action := "start"
+	if out, err := systemctlUser("is-active", unit); err == nil && strings.TrimSpace(string(out)) == "active" {
+		action = "restart"
+	}
+	if out, err := systemctlUser(action, unit); err != nil {
 		msg := strings.TrimSpace(string(out))
 		if strings.Contains(msg, "not found") || strings.Contains(msg, "not be found") {
 			return errors.New("the Vault service is not installed for this user; run ./scripts/install.sh")

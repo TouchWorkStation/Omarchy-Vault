@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/config"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/control"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/files"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
 )
@@ -67,6 +69,8 @@ func (a *app) doctor(ctx context.Context) int {
 	if err := a.getJSON(ctx, "/api/session", &st); err == nil {
 		daemonUp = true
 		add("daemon", lvOK, "Vault is on at http://%s", a.cfg.Listen)
+	} else if errors.Is(err, control.ErrUnsafe) {
+		add("daemon", lvFail, "%v", err)
 	} else {
 		conn, dErr := net.DialTimeout("tcp", a.cfg.Listen, time.Second)
 		if dErr == nil {

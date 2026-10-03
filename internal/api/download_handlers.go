@@ -388,7 +388,7 @@ const maxLocalItems = 200
 // resolveLocal checks files the owner wants to send from this computer
 // and returns them as a session path (one absolute path per line).
 func (s *Server) resolveLocal(w http.ResponseWriter, r *http.Request, paths []string) (string, bool) {
-	if s.Auth == nil || !s.Auth.CheckToken(r.Header.Get(auth.HeaderToken)) {
+	if !s.localToken(r) {
 		writeError(w, http.StatusForbidden, "local_only", "Files outside the Vault can only be sent from this computer's keyboard shortcut or vaultctl.")
 		return "", false
 	}

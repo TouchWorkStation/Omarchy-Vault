@@ -15,7 +15,7 @@ The full threat model is in [../SECURITY.md](../SECURITY.md). This page is the s
 | Reserved mount locations never adoptable | `disks.isReservedTarget` |
 | No destructive disk operations | not implemented anywhere, by policy; tests assert no such calls |
 | Shortcuts: detect, report, never overwrite | `shortcuts.Inspector` |
-| Writes need the 0600 local token or a session + intent header | `api.requireAuth`, `auth.Local` |
+| Writes need the 0600 local token (accepted only on the owner-only control socket, never over TCP) or a session + intent header | `api.requireAuth`, `api.localToken`, `internal/control` |
 | Login codes single-use, 30 s; sessions HttpOnly SameSite=Strict | `auth.Local`, `api.handleLogin` |
 | Adoption: fresh scan, name not path, os.Root, nested-mount check | `storage.Adopt` |
 | Unplugged/moved drives never written to | `storage.Inspect` (UUID + mountinfo) |

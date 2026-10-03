@@ -15,6 +15,7 @@ import (
 
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/config"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/control"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/disks"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/shortcuts"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/storage"
@@ -108,9 +109,51 @@ func (e *env) req(method, path string, body any, hdr map[string]string) *httptes
 	for k, v := range hdr {
 		r.Header.Set(k, v)
 	}
+	if _, ok := hdr[auth.HeaderToken]; ok {
+		// vaultctl sends the token only over its control socket.
+		r = r.WithContext(control.WithSocket(r.Context()))
+	}
 	w := httptest.NewRecorder()
 	e.h.ServeHTTP(w, r)
 	return w
+}
+
+// reqTCP sends a request as if it came over TCP (127.0.0.1:8788), not the
+// control socket.
+func (e *env) reqTCP(method, path string, body any, hdr map[string]string) *httptest.ResponseRecorder {
+	var rd io.Reader
+	if body != nil {
+		b, _ := json.Marshal(body)
+		rd = bytes.NewReader(b)
+	}
+	r := httptest.NewRequest(method, path, rd)
+	r.Host = "127.0.0.1:8788"
+	for k, v := range hdr {
+		r.Header.Set(k, v)
+	}
+	w := httptest.NewRecorder()
+	e.h.ServeHTTP(w, r)
+	return w
+}
+
+// The local token is accepted only on the control socket. Over TCP, where
+// any user on the computer could have listened while Vault was off and
+// captured it, the very same token gets nothing.
+func TestTokenRefusedOverTCP(t *testing.T) {
+	e := newEnv(t)
+	if w := e.reqTCP("POST", "/api/local-login", nil, tokenHdr); w.Code != http.StatusUnauthorized {
+		t.Fatalf("local-login over TCP = %d", w.Code)
+	}
+	if w := e.reqTCP("POST", "/api/pool", map[string]any{"volume": "sda1"}, tokenHdr); w.Code != http.StatusUnauthorized {
+		t.Fatalf("admin change over TCP = %d", w.Code)
+	}
+	if w := e.reqTCP("POST", "/api/download-session", map[string]any{"local_paths": []string{"/tmp"}}, tokenHdr); w.Code < 400 {
+		t.Fatalf("local files over TCP = %d", w.Code)
+	}
+	// Same token over the socket works.
+	if w := e.req("POST", "/api/local-login", nil, tokenHdr); w.Code != http.StatusOK {
+		t.Fatalf("local-login over socket = %d", w.Code)
+	}
 }
 
 var tokenHdr = map[string]string{auth.HeaderToken: testToken}

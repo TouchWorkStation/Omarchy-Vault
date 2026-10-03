@@ -20,6 +20,7 @@ import (
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/api"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/auth"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/config"
+	"github.com/TouchWorkStation/Omarchy-Vault/internal/control"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/demo"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/disks"
 	"github.com/TouchWorkStation/Omarchy-Vault/internal/files"
@@ -190,13 +191,36 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", cfg.Listen, err)
 	}
-	httpSrv := &http.Server{
-		Handler:           srv.Handler(),
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    64 << 10,
+	handler := srv.Handler()
+	newServer := func() *http.Server {
+		return &http.Server{
+			Handler:           handler,
+			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       30 * time.Second,
+			WriteTimeout:      60 * time.Second,
+			IdleTimeout:       120 * time.Second,
+			MaxHeaderBytes:    64 << 10,
+		}
+	}
+	httpSrv := newServer()
+
+	// vaultctl's private channel: the only place the local token is
+	// accepted (see internal/control). Opened after the TCP port is ours,
+	// so a browser sent to that port reaches this vaultd. The demo has
+	// none, so it can never be mistaken for the real Vault.
+	var ctlSrv *http.Server
+	var ctlLn net.Listener
+	if !*demoMode {
+		sock, err := control.Path()
+		if err != nil {
+			return err
+		}
+		if ctlLn, err = control.Listen(sock); err != nil {
+			ln.Close()
+			return fmt.Errorf("control socket: %w", err)
+		}
+		ctlSrv = newServer()
+		ctlSrv.ConnContext = control.ConnContext
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -219,11 +243,15 @@ func run() error {
 	go srv.RunAutoOff(ctx, 30*time.Second)
 	defer func() { stop(); <-workers }()
 
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 2)
 	go func() {
 		log.Info("Omarchy Vault listening", "addr", "http://"+ln.Addr().String(), "version", version.Version)
 		errCh <- httpSrv.Serve(ln)
 	}()
+	if ctlSrv != nil {
+		go func() { errCh <- ctlSrv.Serve(ctlLn) }()
+		defer ctlSrv.Close()
+	}
 
 	select {
 	case err := <-errCh:
@@ -234,6 +262,9 @@ func run() error {
 		log.Info("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+		if ctlSrv != nil {
+			_ = ctlSrv.Shutdown(shutdownCtx)
+		}
 		return httpSrv.Shutdown(shutdownCtx)
 	}
 	return nil

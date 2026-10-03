@@ -20,6 +20,7 @@ Omarchy Vault is one small Go daemon (`vaultd`), a CLI (`vaultctl`), a React das
 │  internal/health     smartctl JSON → Healthy/Warning/Critical       │
 │  internal/storage    adoption, live state, /srv/vault link          │
 │  internal/auth       argon2id, TOTP, lockout, token, sessions       │
+│  internal/control    owner-only Unix socket for vaultctl            │
 │  internal/users      accounts, roles, folder grants (users.json)    │
 │  internal/files      SFTPGo supervisor, admin client, user sync     │
 │  internal/qrsvg      QR codes as SVG (2FA now, transfers later)     │
@@ -150,7 +151,7 @@ Beam stays independent. When it wants persistent storage it can call:
 - `POST /api/v1/beam/download-session`
 - `POST /api/v1/beam/share`
 
-These return the same token/QR payloads as Vault's own flows and work today with the local owner token (`~/.config/omarchy-vault/secrets/local-token`, 0600) sent in the `X-Vault-Token` header; per-client keys arrive with Milestone 6.
+These return the same token/QR payloads as Vault's own flows and work today with the local owner token (`~/.config/omarchy-vault/secrets/local-token`, 0600) sent in the `X-Vault-Token` header **over the control socket** (`$XDG_RUNTIME_DIR/omarchy-vault/control.sock`); the token is refused over TCP. Per-client keys arrive with Milestone 6.
 
 ## Repository layout
 

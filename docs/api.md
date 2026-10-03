@@ -8,7 +8,7 @@ Base URL: `http://127.0.0.1:8788`. Every endpoint is also available under `/api/
 
 Authentication is one of:
 
-- `X-Vault-Token: <contents of ~/.config/omarchy-vault/secrets/local-token>`: the local owner (CLI, Beam), acts as an admin.
+- `X-Vault-Token: <contents of ~/.config/omarchy-vault/secrets/local-token>`: the local owner (CLI, Beam), acts as an admin. **Accepted only on the control socket** `$XDG_RUNTIME_DIR/omarchy-vault/control.sock` (0600, owner only; e.g. `curl --unix-socket … http://127.0.0.1:8788/api/…`). Sent over TCP it gets `401`.
 - The `vault_session` cookie from a sign-in. Writes also need `X-Vault-Request: 1`.
 
 | Endpoint group | Before the first account | After |
@@ -286,7 +286,7 @@ For downloads and shares `files`/`max_files` count downloads, and `received` lis
 
 ### Beam integration
 
-Live, authenticated with the local owner token in `X-Vault-Token`, same bodies and responses as Vault's own endpoints:
+Live, authenticated with the local owner token in `X-Vault-Token` over the control socket, same bodies and responses as Vault's own endpoints:
 
 | Method | Path | Same as |
 |---|---|---|

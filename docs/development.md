@@ -35,7 +35,13 @@ make check     # vet + tests + gofmt check + web typecheck/build
 ./bin/vaultctl shortcuts
 ./bin/vaultctl doctor
 ./bin/vaultd --demo          # or --no-smart, --listen 127.0.0.1:9000, --config path
-VAULT_ADDR=http://127.0.0.1:9000 ./bin/vaultctl status
+```
+
+vaultctl reaches vaultd only through its control socket (`$XDG_RUNTIME_DIR/omarchy-vault/control.sock`), never over TCP. To run a second vaultd beside your real one, give both a different runtime folder:
+
+```sh
+XDG_RUNTIME_DIR=$PWD/.dev-run ./bin/vaultd --listen 127.0.0.1:9000
+XDG_RUNTIME_DIR=$PWD/.dev-run VAULT_ADDR=http://127.0.0.1:9000 ./bin/vaultctl status
 ```
 
 ## Layout and conventions

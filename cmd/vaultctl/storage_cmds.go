@@ -55,7 +55,7 @@ func (a *app) call(ctx context.Context, method, path string, body, out any) erro
 	}
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, method, a.baseURL()+path, rd)
+	req, err := http.NewRequestWithContext(ctx, method, a.apiURL(path), rd)
 	if err != nil {
 		return err
 	}
@@ -63,9 +63,9 @@ func (a *app) call(ctx context.Context, method, path string, body, out any) erro
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := a.daemon(req)
 	if err != nil {
-		return errDaemonDown
+		return err
 	}
 	defer resp.Body.Close()
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))

@@ -74,9 +74,14 @@ Vault runs only when the user turns it on (`vaultctl on`, `vaultctl open`, the S
 
 The local token (`~/.config/omarchy-vault/secrets/local-token`: 32 random bytes, 0600 in a 0700 folder) identifies the desktop owner:
 
-- `vaultctl` sends it as `X-Vault-Token` and acts as an admin. This is how you recover a forgotten admin password: `vaultctl users reset-password <name>`.
-- `vaultctl open` exchanges it for a single-use, 30-second login code, then opens `/login?code=…`. The browser gets a session and never sees the token.
-- Other Unix users on the machine can reach 127.0.0.1:8788 but cannot read the token, so they cannot change anything and, once accounts exist, cannot read anything either.
+- **It travels only over vaultctl's control socket, never over TCP.** Anyone on the computer can listen on 127.0.0.1:8788 while Vault is off (which is most of the time), so a TCP listener there proves nothing about who runs it. vaultctl therefore talks to vaultd only through `$XDG_RUNTIME_DIR/omarchy-vault/control.sock` (fallback: `~/.config/omarchy-vault/run/control.sock`). That covers every request, including the "is Vault on?" probe.
+  - The socket is 0600 inside a 0700 folder owned by you, and vaultd creates it only after it holds the TCP port.
+  - vaultctl refuses to connect unless the folder and socket are owned by you, private, and not symlinks, and unless the process on the other end runs as you (`SO_PEERCRED`).
+  - vaultd closes any connection from another user (`SO_PEERCRED`) before reading it.
+  - vaultd accepts `X-Vault-Token` only on the socket. The same token sent over TCP gets `401`, so even a leaked token is useless there.
+- `vaultctl` acts as an admin with it. This is how you recover a forgotten admin password: `vaultctl users reset-password <name>`.
+- `vaultctl open` exchanges it, over the socket, for a single-use, 30-second login code, then opens `/login?code=…` in the browser. The browser gets a session and never sees the token. The code is issued only after vaultctl has reached the running vaultd, which holds the TCP port, so the browser's request goes to that same vaultd. Codes live only in that vaultd's memory and die with it.
+- Other Unix users on the machine can reach 127.0.0.1:8788, but cannot read the token or reach the socket, so they cannot change anything and, once accounts exist, cannot read anything either.
 - Known limit: the login code appears on `xdg-open`'s command line for a moment. It works once, and only within 30 seconds.
 - Demo mode (`vaultd --demo`) skips sign-in until its sandbox has an account; it never touches real config.
 

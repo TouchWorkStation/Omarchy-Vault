@@ -26,3 +26,4 @@ credentials*.json
 # Stray binaries from "go build" in the repo root
 /vaultctl
 /vaultd
+/.dev-run/

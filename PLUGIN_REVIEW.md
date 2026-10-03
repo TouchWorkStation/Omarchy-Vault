@@ -70,6 +70,7 @@ Defaults are Super + Alt + V / U / D. The shortcut code is [`internal/shortcuts/
   - Upload links are upload-only.
   - Download links are for one item.
   - Share links are read-only and last at most 24 hours.
+- **`vaultctl` talks to Vault only over an owner-only Unix socket** (`$XDG_RUNTIME_DIR/omarchy-vault/control.sock`: 0600, in a 0700 folder, with the peer's user id checked by both ends). Its local owner token (a 0600 file) is never sent over TCP, and Vault refuses it there. So another user who listens on 127.0.0.1:8788 while Vault is off gets nothing from `vaultctl`, and a token couldn't be replayed anyway.
 - **Sending files copied in the file manager** (Super + Alt + D) is allowed only with the local owner token, which is a 0600 file that `vaultctl` reads. A browser session can never do it. It is also refused for:
   - symlinks
   - `~/.ssh`, `~/.gnupg`, `~/.password-store`, keyrings and Vault's own config
