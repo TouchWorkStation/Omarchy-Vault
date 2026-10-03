@@ -137,7 +137,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if bootstrap {
 		// First account: sign its creator in as that account.
-		s.signIn(w, r, created, req.Password)
+		s.signIn(w, r, created)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"user": created.View()})
 }
@@ -294,7 +294,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	if err := s.syncFiles(r.Context()); err != nil {
 		s.Log.Error("files: user sync failed", "err", err)
 	}
-	s.signIn(w, r, u, req.New) // … and keep this browser signed in
+	s.signIn(w, r, u) // … and keep this browser signed in
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 

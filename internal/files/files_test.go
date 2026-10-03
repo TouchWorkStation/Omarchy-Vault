@@ -30,7 +30,10 @@ func TestFolderObjectName(t *testing.T) {
 }
 
 func TestDesired(t *testing.T) {
-	admin, _ := Desired(users.User{Username: "chris", Role: users.Admin, PasswordHash: "$argon2id$h"}, "/data/current", "/homes")
+	admin, _ := Desired(users.User{Username: "chris", Role: users.Admin, PasswordHash: "$argon2id$h"}, "files-only-pw", "/data/current", "/homes")
+	if admin.Password != "files-only-pw" {
+		t.Errorf("SFTPGo must get the files-only password, not the Vault hash: %q", admin.Password)
+	}
 	if admin.HomeDir != "/data/current" || !slices.Equal(admin.Permissions["/"], permReadWrite) || len(admin.VirtualFolders) != 0 {
 		t.Errorf("admin = %+v", admin)
 	}
@@ -41,7 +44,7 @@ func TestDesired(t *testing.T) {
 	}
 
 	fam, folders := Desired(users.User{Username: "ann", Role: users.Family, PasswordHash: "h", Disabled: true,
-		Folders: []users.Folder{{Name: "Photos", Access: users.ReadWrite}, {Name: "Documents", Access: users.ReadOnly}}}, "/data/current", "/homes")
+		Folders: []users.Folder{{Name: "Photos", Access: users.ReadWrite}, {Name: "Documents", Access: users.ReadOnly}}}, "pw", "/data/current", "/homes")
 	if fam.HomeDir != "/homes/ann" || fam.Status != 0 {
 		t.Errorf("family home/status = %s %d", fam.HomeDir, fam.Status)
 	}
@@ -56,9 +59,23 @@ func TestDesired(t *testing.T) {
 	}
 
 	guest, _ := Desired(users.User{Username: "gus", Role: users.Guest, PasswordHash: "h",
-		Folders: []users.Folder{{Name: "Shared", Access: users.ReadWrite}}}, "/data/current", "/homes")
+		Folders: []users.Folder{{Name: "Shared", Access: users.ReadWrite}}}, "pw", "/data/current", "/homes")
 	if !slices.Equal(guest.Permissions["/Shared"], permReadOnly) || !slices.Contains(guest.Filters.WebClient, "write-disabled") {
 		t.Errorf("guest must stay read-only: %+v", guest)
+	}
+}
+
+func TestUserPassword(t *testing.T) {
+	if _, err := (&Client{}).UserPassword("ann"); err == nil {
+		t.Fatal("a client without a key must not derive passwords")
+	}
+	c := &Client{UserKey: []byte(strings.Repeat("k", 43))}
+	a1, _ := c.UserPassword("ann")
+	a2, _ := c.UserPassword("ann")
+	b, _ := c.UserPassword("bob")
+	other, _ := (&Client{UserKey: []byte(strings.Repeat("x", 43))}).UserPassword("ann")
+	if a1 != a2 || a1 == b || a1 == other || len(a1) != 64 {
+		t.Errorf("passwords: %q %q %q %q", a1, a2, b, other)
 	}
 }
 
@@ -106,30 +123,52 @@ func TestIntegration(t *testing.T) {
 		{Username: "ann", Role: users.Family, PasswordHash: hash("family-pass-123"), Folders: []users.Folder{{Name: "Photos", Access: users.ReadWrite}}},
 		{Username: "gus", Role: users.Guest, PasswordHash: hash("guest-pass-123"), Folders: []users.Folder{{Name: "Shared", Access: users.ReadOnly}}},
 	}
+	// An account synced by an older Vault, which sent the Vault hash.
+	old, _ := Desired(list[0], list[0].PasswordHash, root, p.HomesDir)
+	if err := c.putUser(ctx, old, false); err != nil {
+		t.Fatal(err)
+	}
+	if tok := userToken(t, "chris", "admin-pass-123"); tok == "" {
+		t.Fatal("setup: old-style account should accept the Vault password")
+	}
 	if err := Sync(ctx, c, list, root, p.HomesDir); err != nil {
 		t.Fatal(err)
 	}
+	// Syncing replaces it, so the Vault password stops working there.
+	if tok := userToken(t, "chris", "admin-pass-123"); tok != "" {
+		t.Fatal("old Vault password still accepted after sync")
+	}
 
-	// SFTPGo accepts Vault's argon2id hash: web SSO works, wrong passwords fail.
-	if ck, err := c.WebLogin(ctx, "ann", "family-pass-123"); err != nil || ck.Path != WebRoot+"/web/client" || !ck.HttpOnly {
+	pw := func(name string) string { p, _ := c.UserPassword(name); return p }
+
+	// Vault signs users in with their files-only password.
+	if ck, err := c.WebLogin(ctx, "ann", pw("ann")); err != nil || ck.Path != WebRoot+"/web/client" || !ck.HttpOnly {
 		t.Fatalf("web login: %v %+v", err, ck)
+	}
+	// The Vault password alone does not open SFTPGo directly, so 2FA and
+	// lockout can't be skipped by going to 127.0.0.1:8789.
+	if _, err := c.WebLogin(ctx, "ann", "family-pass-123"); err == nil {
+		t.Fatal("Vault password accepted by SFTPGo web login")
+	}
+	if tok := userToken(t, "ann", "family-pass-123"); tok != "" {
+		t.Fatal("Vault password accepted by SFTPGo REST API")
 	}
 	if _, err := c.WebLogin(ctx, "ann", "wrong-pass-123"); err == nil {
 		t.Fatal("wrong password accepted")
 	}
 
 	// Family sees only their folders.
-	if names := userDirs(t, "ann", "family-pass-123"); !slices.Equal(names, []string{"Photos"}) {
+	if names := userDirs(t, "ann", pw("ann")); !slices.Equal(names, []string{"Photos"}) {
 		t.Errorf("ann sees %v", names)
 	}
-	if names := userDirs(t, "chris", "admin-pass-123"); !slices.Contains(names, "Documents") {
+	if names := userDirs(t, "chris", pw("chris")); !slices.Contains(names, "Documents") {
 		t.Errorf("admin sees %v", names)
 	}
 	// Guest cannot upload into a read-only folder.
-	if code := upload(t, "gus", "guest-pass-123", "/Shared"); code < 400 {
+	if code := upload(t, "gus", pw("gus"), "/Shared"); code < 400 {
 		t.Errorf("guest upload status %d", code)
 	}
-	if code := upload(t, "ann", "family-pass-123", "/Photos"); code >= 300 {
+	if code := upload(t, "ann", pw("ann"), "/Photos"); code >= 300 {
 		t.Errorf("family upload status %d", code)
 	}
 
@@ -138,7 +177,7 @@ func TestIntegration(t *testing.T) {
 	if err := Sync(ctx, c, list[:2], root, p.HomesDir); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.WebLogin(ctx, "ann", "family-pass-123"); err == nil {
+	if _, err := c.WebLogin(ctx, "ann", pw("ann")); err == nil {
 		t.Error("disabled user signed in")
 	}
 	if u, _ := c.getUser(ctx, "gus"); u != nil {

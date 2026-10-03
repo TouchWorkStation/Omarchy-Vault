@@ -220,11 +220,14 @@ func (m *Manager) Run(ctx context.Context) {
 	}
 	adminPass, err := m.secret("sftpgo-admin")
 	if err == nil {
-		var signing string
+		var signing, userKey string
 		signing, err = m.secret("sftpgo-signing")
 		if err == nil {
+			userKey, err = m.secret("sftpgo-users")
+		}
+		if err == nil {
 			m.mu.Lock()
-			m.client = &Client{Base: "http://" + Host + ":" + Port, WebRoot: WebRoot, User: adminUser, Password: adminPass}
+			m.client = &Client{Base: "http://" + Host + ":" + Port, WebRoot: WebRoot, User: adminUser, Password: adminPass, UserKey: []byte(userKey)}
 			m.mu.Unlock()
 			m.supervise(ctx, m.env(adminPass, signing))
 			return

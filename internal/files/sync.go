@@ -56,13 +56,15 @@ func FolderObjectName(name string) string {
 	return "vault-" + strings.Trim(b.String(), "-") + "-" + hex.EncodeToString(sum[:3])
 }
 
-// Desired builds the SFTPGo user for a Vault user. root is the Vault's
-// data link (~/.local/share/omarchy-vault/current): if the drive goes away
-// the link dangles, so SFTPGo cannot write to the system disk.
-func Desired(u users.User, root, homesDir string) (sftpUser, []folder) {
+// Desired builds the SFTPGo user for a Vault user. password is the
+// account's SFTPGo-only password (Client.UserPassword), never its Vault
+// password or hash. root is the Vault's data link
+// (~/.local/share/omarchy-vault/current): if the drive goes away the link
+// dangles, so SFTPGo cannot write to the system disk.
+func Desired(u users.User, password, root, homesDir string) (sftpUser, []folder) {
 	su := sftpUser{
 		Username:       u.Username,
-		Password:       u.PasswordHash,
+		Password:       password,
 		Status:         1,
 		AdditionalInfo: managedTag,
 		Description:    "Omarchy Vault " + string(u.Role),
@@ -118,7 +120,11 @@ func Sync(ctx context.Context, c *Client, list []users.User, root, homesDir stri
 	want := map[string]bool{}
 	for _, u := range list {
 		want[u.Username] = true
-		su, folders := Desired(u, root, homesDir)
+		pw, err := c.UserPassword(u.Username)
+		if err != nil {
+			return err
+		}
+		su, folders := Desired(u, pw, root, homesDir)
 		if u.Role != users.Admin {
 			if err := os.MkdirAll(su.HomeDir, 0o700); err != nil {
 				errs = append(errs, err)

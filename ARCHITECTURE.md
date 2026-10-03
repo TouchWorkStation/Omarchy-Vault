@@ -73,6 +73,7 @@ Omarchy Vault is one small Go daemon (`vaultd`), a CLI (`vaultctl`), a React das
     local-token             0600, owner access for vaultctl
     sftpgo-admin            0600, SFTPGo admin password (random)
     sftpgo-signing          0600, SFTPGo JWT signing key (random)
+    sftpgo-users            0600, key for each account's Files-only SFTPGo password (random)
 
 ~/.local/share/omarchy-vault/
   current                   → the Vault folder on the drive (removed while offline)

@@ -75,6 +75,7 @@ Defaults are Super + Alt + V / U / D. The shortcut code is [`internal/shortcuts/
   - `~/.ssh`, `~/.gnupg`, `~/.password-store`, keyrings and Vault's own config
   - `/etc`, `/proc`, `/sys`, `/dev`, `/boot`, `/root`, and `/run` except drives the file manager mounts under `/run/media`
   - any folder that contains one of these
+- **Optional Files browser (SFTPGo, off unless installed with `--with-files`):** SFTPGo listens on 127.0.0.1:8789, with its web admin, SFTP, FTP and WebDAV turned off. Each account gets a random Files-only SFTPGo password that only Vault knows (an HMAC under a 0600 key), never the Vault password or its hash. So a local user can't sign in to SFTPGo directly and skip Vault's 2FA and lockout. Vault signs users in to Files only after its own checks.
 - Typical memory while on is about 40 to 55 MB (the optional SFTPGo adds about 60 MB). Nothing runs when off.
 
 Full threat model: [`SECURITY.md`](SECURITY.md).

@@ -3,6 +3,9 @@ package files
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,7 +24,9 @@ type Client struct {
 	WebRoot  string // /files
 	User     string
 	Password string
-	HTTP     *http.Client
+	// UserKey derives each account's SFTPGo password (see UserPassword).
+	UserKey []byte
+	HTTP    *http.Client
 
 	mu    sync.Mutex
 	token string
@@ -35,6 +40,24 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string { return fmt.Sprintf("sftpgo: %d %s", e.Status, e.Message) }
+
+// errNoUserKey means the client has no key to derive account passwords.
+var errNoUserKey = errors.New("files: no account key")
+
+// UserPassword is the password Vault gives an account inside SFTPGo:
+// HMAC-SHA256 of the username under a random key stored 0600 in Vault's
+// secrets folder. It is never the account's Vault password (nor its
+// hash), so knowing someone's Vault password is not enough to sign in to
+// SFTPGo directly on 127.0.0.1:8789 and skip Vault's 2FA and lockout.
+// Only Vault, which checks those first, can sign users in to Files.
+func (c *Client) UserPassword(username string) (string, error) {
+	if len(c.UserKey) < 32 {
+		return "", errNoUserKey
+	}
+	mac := hmac.New(sha256.New, c.UserKey)
+	mac.Write([]byte(username))
+	return hex.EncodeToString(mac.Sum(nil)), nil
+}
 
 // IsNotFound reports a 404 from SFTPGo.
 func IsNotFound(err error) bool {

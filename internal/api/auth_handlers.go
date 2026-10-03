@@ -267,14 +267,16 @@ func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.Limiter.Succeed(keys...)
-	s.signIn(w, r, u, req.Password)
+	s.signIn(w, r, u)
 	v := u.View()
 	writeJSON(w, http.StatusOK, map[string]any{"user": v})
 }
 
 // signIn opens a fresh session (the id is new on every login) and, when
-// the file service runs, signs the user into Files too.
-func (s *Server) signIn(w http.ResponseWriter, r *http.Request, u users.User, password string) {
+// the file service runs, signs the user into Files too, with the
+// account's SFTPGo-only password. Callers have already checked the
+// Vault password, 2FA and lockout.
+func (s *Server) signIn(w http.ResponseWriter, r *http.Request, u users.User) {
 	sid, ttl, err := s.Auth.NewSession(auth.Identity{Username: u.Username, Role: string(u.Role)})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", "Something went wrong.")
@@ -289,7 +291,11 @@ func (s *Server) signIn(w http.ResponseWriter, r *http.Request, u users.User, pa
 		if c := s.Files.Client(); c != nil {
 			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 			defer cancel()
-			ck, err := c.WebLogin(ctx, u.Username, password)
+			pw, err := c.UserPassword(u.Username)
+			var ck *http.Cookie
+			if err == nil {
+				ck, err = c.WebLogin(ctx, u.Username, pw)
+			}
 			if err == nil {
 				ck.Secure = isHTTPS(r)
 				ck.Name = filesCookie

@@ -87,7 +87,9 @@ The local token (`~/.config/omarchy-vault/secrets/local-token`: 32 random bytes,
   - HTTP listens on 127.0.0.1:8789 only.
   - Web admin, OpenAPI, SFTP, FTP, WebDAV and telemetry are off.
 - **Admin credentials:** SFTPGo's admin password and JWT signing key are random, stored 0600 in `secrets/`, and never shown or logged. SFTPGo's own error lines are relayed to Vault's log. Its per-request access lines are not.
-- **Users:** Vault mirrors each account into SFTPGo by sending the argon2id *hash*, never the password.
+- **Users:** Vault mirrors each account into SFTPGo with a **separate, Files-only password**: HMAC-SHA256 of the username under a random 256-bit key (`secrets/sftpgo-users`, 0600). The account's Vault password and its hash are never sent to SFTPGo.
+  - So knowing someone's Vault password (for example, another Unix user on the same computer who can reach 127.0.0.1:8789) is not enough to sign in to SFTPGo directly. Only Vault can sign users in to Files, and it does so only after its own password check, 2FA and lockout.
+  - Accounts mirrored by older versions, which used the Vault hash, are switched over the next time SFTPGo starts.
   - Family and guest users get an empty private home, plus virtual folders for exactly the folders granted.
   - Permissions are explicit lists (`list, download, upload, overwrite, delete, rename, create_dirs`): no symlink creation, chmod, chown or chtimes.
   - Guests get only `list, download` and write-disabled.
@@ -96,7 +98,7 @@ The local token (`~/.config/omarchy-vault/secrets/local-token`: 32 random bytes,
   - SFTPGo users Vault did not create are never modified or deleted.
 - **Proxy:** Files is reached only through `/files/` on Vault. The proxy requires a Vault session, so Vault's sign-in, lockout and 2FA protect Files as well.
   - Only SFTPGo's own `jwt` cookie is forwarded upstream. Vault's session cookie and headers are stripped.
-  - At sign-in, Vault signs the user into the web client on their behalf. The resulting cookie is HttpOnly, SameSite=Strict and scoped to `/files/web/client`, and SFTPGo binds it to 127.0.0.1.
+  - At sign-in, Vault signs the user into the web client on their behalf, using the Files-only password. The resulting cookie is HttpOnly, SameSite=Strict and scoped to `/files/web/client`, and SFTPGo binds it to 127.0.0.1.
 - **Offline drive:** SFTPGo's home paths go through the data link. When the drive is missing, Vault removes the link and stops SFTPGo, so nothing can be written to the system disk.
 
 ## Privileged helper model
